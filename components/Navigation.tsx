@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { UserButton } from '@clerk/nextjs';
+// import { UserButton } from '@clerk/nextjs'; // Temporarily disabled
 import {
   LayoutDashboard,
   Calendar,
@@ -56,7 +56,7 @@ export function Navigation() {
             </div>
           </div>
           <div className="flex items-center">
-            <UserButton />
+            {/* <UserButton /> */}
           </div>
         </div>
       </div>
