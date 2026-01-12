@@ -1,0 +1,168 @@
+import Link from 'next/link';
+import { Briefcase, Users, UserCheck, DollarSign, Plus, UserPlus, Sparkles } from 'lucide-react';
+import { getDashboardMetrics, getUpcomingJobs, getClients, getCleaners } from '@/lib/airtable';
+import { UpcomingJobsTable } from '@/components/UpcomingJobsTable';
+
+export default async function WorkingDashboardPage() {
+  try {
+    const [metrics, upcomingJobs, clients, cleaners] = await Promise.all([
+      getDashboardMetrics(),
+      getUpcomingJobs(),
+      getClients(),
+      getCleaners(),
+    ]);
+
+    // Create lookup maps for client and cleaner names
+    const clientMap = new Map(clients.map(c => [c.id, c.fields.Name]));
+    const cleanerMap = new Map(cleaners.map(c => [c.id, c.fields.Name]));
+
+    const formatCurrency = (amount: number) => {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+      }).format(amount);
+    };
+
+    return (
+      <div className="space-y-8">
+        {/* Page Header */}
+        <div className="mb-6">
+          <div className="sm:flex sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-tidyco-navy">Dashboard</h1>
+              <p className="mt-1 text-sm text-gray-500">Overview of your cleaning business</p>
+            </div>
+            <div className="mt-4 sm:ml-16 sm:mt-0 flex gap-2">
+              <Link
+                href="/jobs/new"
+                className="inline-flex items-center rounded-md bg-tidyco-blue px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-tidyco-navy"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                New Job
+              </Link>
+              <Link
+                href="/clients/new"
+                className="inline-flex items-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-tidyco-navy shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+              >
+                <UserPlus className="mr-2 h-4 w-4" />
+                New Client
+              </Link>
+              <Link
+                href="/cleaners/new"
+                className="inline-flex items-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-tidyco-navy shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                New Cleaner
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {/* This Week */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-5 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <dt className="text-sm font-medium text-gray-500 truncate">This Week</dt>
+                <dd className="mt-1 text-3xl font-semibold tracking-tight text-tidyco-navy">
+                  {metrics.upcomingJobsCount}
+                </dd>
+                <p className="mt-1 text-sm text-gray-500">
+                  {formatCurrency(metrics.upcomingJobsRevenue)}
+                </p>
+              </div>
+              <div className="flex-shrink-0">
+                <Briefcase className="h-8 w-8 text-tidyco-blue" />
+              </div>
+            </div>
+          </div>
+
+          {/* Monthly Revenue */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-5 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <dt className="text-sm font-medium text-gray-500 truncate">Monthly Revenue</dt>
+                <dd className="mt-1 text-3xl font-semibold tracking-tight text-tidyco-navy">
+                  {formatCurrency(metrics.monthlyRevenue)}
+                </dd>
+              </div>
+              <div className="flex-shrink-0">
+                <DollarSign className="h-8 w-8 text-tidyco-blue" />
+              </div>
+            </div>
+          </div>
+
+          {/* Active Clients */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-5 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <dt className="text-sm font-medium text-gray-500 truncate">Active Clients</dt>
+                <dd className="mt-1 text-3xl font-semibold tracking-tight text-tidyco-navy">
+                  {metrics.activeClientsCount}
+                </dd>
+              </div>
+              <div className="flex-shrink-0">
+                <Users className="h-8 w-8 text-tidyco-blue" />
+              </div>
+            </div>
+          </div>
+
+          {/* Active Cleaners */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-5 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <dt className="text-sm font-medium text-gray-500 truncate">Active Cleaners</dt>
+                <dd className="mt-1 text-3xl font-semibold tracking-tight text-tidyco-navy">
+                  {metrics.activeCleanersCount}
+                </dd>
+                <p className="mt-1 text-sm text-gray-500">
+                  Avg Score: {metrics.avgQualityScore || 'N/A'}
+                </p>
+              </div>
+              <div className="flex-shrink-0">
+                <UserCheck className="h-8 w-8 text-tidyco-blue" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Upcoming Jobs Table */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-tidyco-navy">Upcoming Jobs</h2>
+            <Link href="/jobs" className="text-sm font-medium text-tidyco-blue hover:text-tidyco-navy">
+              View all →
+            </Link>
+          </div>
+
+          <UpcomingJobsTable
+            jobs={upcomingJobs}
+            clientMap={clientMap}
+            cleanerMap={cleanerMap}
+          />
+        </div>
+
+        {/* Success Message */}
+        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+          <p className="text-green-800 font-medium">✅ Dashboard loaded successfully!</p>
+          <p className="text-sm text-green-700 mt-1">
+            Showing {metrics.upcomingJobsCount} jobs, {metrics.activeClientsCount} clients, {metrics.activeCleanersCount} cleaners
+          </p>
+        </div>
+      </div>
+    );
+  } catch (error: any) {
+    return (
+      <div className="p-8">
+        <div className="bg-red-50 p-6 rounded-lg border border-red-200">
+          <h1 className="text-2xl font-bold text-red-800 mb-4">Error Loading Dashboard</h1>
+          <p className="text-red-700 mb-2"><strong>Message:</strong> {error.message}</p>
+          <pre className="text-xs bg-red-100 p-4 rounded overflow-x-auto text-red-900">
+            {error.stack}
+          </pre>
+        </div>
+      </div>
+    );
+  }
+}
