@@ -10,13 +10,15 @@ import {
   Users,
   UserCheck,
   FileText,
-  DollarSign
+  DollarSign,
+  UserPlus
 } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Calendar', href: '/calendar/daily', icon: Calendar },
   { name: 'Jobs', href: '/jobs', icon: Briefcase },
+  { name: 'Leads', href: '/leads', icon: UserPlus },
   { name: 'Clients', href: '/clients', icon: Users },
   { name: 'Cleaners', href: '/cleaners', icon: UserCheck },
   { name: 'Finances', href: '/finances', icon: DollarSign },

@@ -13,7 +13,7 @@ export interface Client {
     'State'?: string;
     'Zip Code'?: string;
     'Owner'?: 'Sean' | 'Webb';
-    'Lead Source'?: 'Angi' | 'Referral' | 'Direct' | 'Other';
+    'Lead Source'?: 'Angi' | 'Referral' | 'Direct' | 'Google' | 'Facebook' | 'Thumbtack' | 'Other';
     'Preferred Payment Method'?: 'Zelle' | 'Square' | 'Cash';
     'Has Left Review'?: boolean;
     'Booking History'?: string[]; // Array of Job record IDs
@@ -302,6 +302,36 @@ export interface Team {
     'Member Count'?: number; // Count from Members
     'Total Hourly Rate'?: number; // Rollup SUM of Members.Hourly Rate
     'Jobs'?: string[]; // Job record IDs (inverse link)
+  };
+}
+
+export interface Lead {
+  id: string;
+  fields: {
+    'Name': string;
+    'Email'?: string;
+    'Phone'?: string;
+    'Address'?: string;
+    'City'?: string;
+    'State'?: string;
+    'Zip Code'?: string;
+    'Lead Source'?: 'Angi' | 'Referral' | 'Direct' | 'Google' | 'Facebook' | 'Thumbtack' | 'Other';
+    'Angi Lead ID'?: string; // For deduplication from Angi imports
+    'Service Type Interested'?: 'General Clean' | 'Deep Clean' | 'Move-In-Out';
+    'Bedrooms'?: number;
+    'Bathrooms'?: number;
+    'Status'?: 'New' | 'Contacted' | 'Qualified' | 'Quote Sent' | 'Won' | 'Lost' | 'Churned';
+    'Owner'?: 'Sean' | 'Webb';
+    'Lead Score'?: number; // 0-100 based on engagement
+    'Times Contacted'?: number;
+    'Last Contact Date'?: string;
+    'Next Follow-Up Date'?: string;
+    'Notes'?: string;
+    'Lost Reason'?: 'Price too high' | 'Chose competitor' | 'No response' | 'Not ready' | 'Outside service area' | 'Other';
+    'Converted Client'?: string[]; // Client record ID when converted
+    'Original Client'?: string[]; // Original client if churned re-entered as lead
+    'Created Date'?: string;
+    'Last Modified'?: string;
   };
 }
 

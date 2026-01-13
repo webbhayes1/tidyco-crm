@@ -11,6 +11,7 @@ import {
   TrainingModule,
   CleanerTraining,
   Team,
+  Lead,
 } from '@/types/airtable';
 
 // Initialize Airtable
@@ -33,6 +34,7 @@ const TABLES = {
   TRAINING_MODULES: 'Training Modules',
   CLEANER_TRAINING: 'Cleaner Training',
   TEAMS: 'Teams',
+  LEADS: 'Leads',
 } as const;
 
 // Helper function to convert Airtable record to our type
@@ -375,6 +377,98 @@ export async function getActiveTeams(): Promise<Team[]> {
     .select({ filterByFormula: formula })
     .all();
   return records.map(convertRecord<Team>);
+}
+
+// ===== LEADS =====
+export async function getLeads(options?: {
+  view?: string;
+  filterByFormula?: string;
+  maxRecords?: number;
+}): Promise<Lead[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const selectOptions: any = {
+    view: options?.view || 'Grid view',
+  };
+
+  if (options?.filterByFormula) {
+    selectOptions.filterByFormula = options.filterByFormula;
+  }
+  if (options?.maxRecords !== undefined) {
+    selectOptions.maxRecords = options.maxRecords;
+  }
+
+  const records = await base(TABLES.LEADS).select(selectOptions).all();
+  return records.map(convertRecord<Lead>);
+}
+
+export async function getLead(id: string): Promise<Lead | null> {
+  try {
+    const record = await base(TABLES.LEADS).find(id);
+    return convertRecord<Lead>(record);
+  } catch (error) {
+    console.error('Error fetching lead:', error);
+    return null;
+  }
+}
+
+export async function createLead(fields: Lead['fields']): Promise<Lead> {
+  const record = await base(TABLES.LEADS).create(fields as unknown as FieldSet);
+  return convertRecord<Lead>(record);
+}
+
+export async function createLeads(leads: Lead['fields'][]): Promise<Lead[]> {
+  // Airtable allows max 10 records per batch
+  const results: Lead[] = [];
+  for (let i = 0; i < leads.length; i += 10) {
+    const batch = leads.slice(i, i + 10).map(fields => ({ fields: fields as unknown as FieldSet }));
+    const records = await base(TABLES.LEADS).create(batch);
+    results.push(...records.map(convertRecord<Lead>));
+  }
+  return results;
+}
+
+export async function updateLead(id: string, fields: Partial<Lead['fields']>): Promise<Lead> {
+  const record = await base(TABLES.LEADS).update(id, fields as unknown as FieldSet);
+  return convertRecord<Lead>(record);
+}
+
+export async function deleteLead(id: string): Promise<void> {
+  await base(TABLES.LEADS).destroy(id);
+}
+
+// Get leads by status
+export async function getLeadsByStatus(status: Lead['fields']['Status']): Promise<Lead[]> {
+  const formula = `{Status} = '${status}'`;
+  return getLeads({ filterByFormula: formula });
+}
+
+// Get new leads (for dashboard)
+export async function getNewLeads(): Promise<Lead[]> {
+  return getLeadsByStatus('New');
+}
+
+// Get leads needing follow-up (Next Follow-Up Date is today or past)
+export async function getLeadsNeedingFollowUp(): Promise<Lead[]> {
+  const today = new Date().toISOString().split('T')[0];
+  const formula = `AND({Next Follow-Up Date} <= '${today}', {Status} != 'Won', {Status} != 'Lost')`;
+  return getLeads({ filterByFormula: formula });
+}
+
+// Check for duplicate lead by phone or Angi Lead ID
+export async function findDuplicateLead(phone?: string, angiLeadId?: string): Promise<Lead | null> {
+  if (!phone && !angiLeadId) return null;
+
+  const conditions: string[] = [];
+  if (phone) {
+    conditions.push(`{Phone} = '${phone}'`);
+  }
+  if (angiLeadId) {
+    conditions.push(`{Angi Lead ID} = '${angiLeadId}'`);
+  }
+
+  const formula = conditions.length > 1 ? `OR(${conditions.join(', ')})` : conditions[0];
+  const leads = await getLeads({ filterByFormula: formula, maxRecords: 1 });
+  return leads.length > 0 ? leads[0] : null;
 }
 
 // ===== DASHBOARD METRICS =====

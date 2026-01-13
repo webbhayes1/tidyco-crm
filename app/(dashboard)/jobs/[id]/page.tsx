@@ -41,9 +41,14 @@ export default async function JobDetailPage({ params }: { params: { id: string }
   // Calculate totals for team jobs
   const totalHourlyRate = validCleaners.reduce((sum, c) => sum + (c?.fields['Hourly Rate'] || 0), 0);
   const actualHours = job.fields['Actual Hours'] || job.fields['Duration Hours'] || 0;
-  const tipPerCleaner = isTeamJob && job.fields['Tip Amount']
-    ? job.fields['Tip Amount'] / validCleaners.length
-    : job.fields['Tip Amount'] || 0;
+  const tipAmount = job.fields['Tip Amount'] || 0;
+  const tipPerCleaner = isTeamJob && tipAmount
+    ? tipAmount / validCleaners.length
+    : tipAmount;
+
+  // Calculate total team payout (sum of all cleaners' base pay + total tips)
+  const totalTeamBasePay = totalHourlyRate * actualHours;
+  const totalTeamPayout = totalTeamBasePay + tipAmount;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -440,7 +445,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <div className="flex justify-between text-sm font-semibold">
                       <span className="text-gray-900">Total Team Payout</span>
-                      <span className="text-green-600">{formatCurrency(job.fields['Total Cleaner Payout'] || 0)}</span>
+                      <span className="text-green-600">{formatCurrency(totalTeamPayout)}</span>
                     </div>
                     {(job.fields['Tip Amount'] || 0) > 0 && (
                       <div className="text-xs text-gray-500 mt-1">
