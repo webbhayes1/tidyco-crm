@@ -22,6 +22,8 @@ const parseDate = (dateStr: string) => {
 type EnrichedJob = Job & {
   clientName?: string | null;
   cleanerName?: string | null;
+  cleanerNames?: string[];
+  cleanerCount?: number;
 };
 
 export default function JobsPage() {
@@ -71,7 +73,21 @@ export default function JobsPage() {
     {
       key: 'Cleaner',
       label: 'Cleaner',
-      render: (job) => job.cleanerName || <span className="text-orange-600 font-medium">Unassigned</span>,
+      render: (job) => {
+        const count = job.cleanerCount || 0;
+        if (count === 0) {
+          return <span className="text-orange-600 font-medium">Unassigned</span>;
+        }
+        if (count === 1) {
+          return job.cleanerName;
+        }
+        return (
+          <div>
+            <span className="font-medium">{count} cleaners</span>
+            <div className="text-xs text-gray-500">{job.cleanerNames?.slice(0, 2).join(', ')}{count > 2 ? '...' : ''}</div>
+          </div>
+        );
+      },
     },
     {
       key: 'Service Type',

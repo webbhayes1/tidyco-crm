@@ -116,6 +116,7 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
     bedrooms: client?.fields['Bedrooms'] || 3,
     bathrooms: client?.fields['Bathrooms'] || 2,
     preferences: client?.fields.Preferences || '',
+    entryInstructions: client?.fields['Entry Instructions'] || '',
     notes: client?.fields.Notes || '',
   });
 
@@ -142,6 +143,7 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
         Status: formData.status as Client['fields']['Status'],
         Notes: formData.notes,
         Preferences: formData.preferences,
+        'Entry Instructions': formData.entryInstructions,
       };
 
       // Only add optional fields if they have values
@@ -698,12 +700,26 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
+            Entry Instructions
+          </label>
+          <textarea
+            value={formData.entryInstructions}
+            onChange={(e) => handleChange('entryInstructions', e.target.value)}
+            placeholder="Gate codes, key locations, garage codes, how to access property..."
+            rows={3}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+          />
+          <p className="text-xs text-gray-500 mt-1">Instructions for cleaners to enter the property</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
             Client Preferences
           </label>
           <textarea
             value={formData.preferences}
             onChange={(e) => handleChange('preferences', e.target.value)}
-            placeholder="Any special requests, focus areas, access instructions, etc."
+            placeholder="Any special requests, focus areas, cleaning preferences, etc."
             rows={3}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg"
           />

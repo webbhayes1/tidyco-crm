@@ -6,7 +6,7 @@ import { Trash2 } from 'lucide-react';
 
 interface DeleteButtonProps {
   id: string;
-  type: 'client' | 'cleaner' | 'job';
+  type: 'client' | 'cleaner' | 'job' | 'team';
   name: string;
   redirectTo: string;
 }

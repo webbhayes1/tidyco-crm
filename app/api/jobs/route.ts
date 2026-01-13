@@ -14,11 +14,20 @@ export async function GET() {
     const cleanerMap = new Map(cleaners.map(c => [c.id, c.fields.Name]));
 
     // Enrich jobs with client and cleaner names
-    const enrichedJobs = jobs.map(job => ({
-      ...job,
-      clientName: job.fields.Client?.[0] ? clientMap.get(job.fields.Client[0]) : null,
-      cleanerName: job.fields.Cleaner?.[0] ? cleanerMap.get(job.fields.Cleaner[0]) : null,
-    }));
+    const enrichedJobs = jobs.map(job => {
+      const cleanerIds = job.fields.Cleaner || [];
+      const cleanerNames = cleanerIds
+        .map(id => cleanerMap.get(id))
+        .filter(Boolean) as string[];
+
+      return {
+        ...job,
+        clientName: job.fields.Client?.[0] ? clientMap.get(job.fields.Client[0]) : null,
+        cleanerName: cleanerNames.length > 0 ? cleanerNames[0] : null,
+        cleanerNames: cleanerNames,
+        cleanerCount: cleanerNames.length,
+      };
+    });
 
     return NextResponse.json(enrichedJobs);
   } catch (error) {

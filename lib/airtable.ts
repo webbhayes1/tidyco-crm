@@ -10,6 +10,7 @@ import {
   Quote,
   TrainingModule,
   CleanerTraining,
+  Team,
 } from '@/types/airtable';
 
 // Initialize Airtable
@@ -31,6 +32,7 @@ const TABLES = {
   QUOTES: 'Quotes',
   TRAINING_MODULES: 'Training Modules',
   CLEANER_TRAINING: 'Cleaner Training',
+  TEAMS: 'Teams',
 } as const;
 
 // Helper function to convert Airtable record to our type
@@ -332,6 +334,47 @@ export async function getCleanerTraining(cleanerId?: string): Promise<CleanerTra
     .select(options)
     .all();
   return records.map(convertRecord<CleanerTraining>);
+}
+
+// ===== TEAMS =====
+export async function getTeams(view?: string): Promise<Team[]> {
+  const records = await base(TABLES.TEAMS)
+    .select({ view: view || 'Grid view' })
+    .all();
+  return records.map(convertRecord<Team>);
+}
+
+export async function getTeam(id: string): Promise<Team | null> {
+  try {
+    const record = await base(TABLES.TEAMS).find(id);
+    return convertRecord<Team>(record);
+  } catch (error) {
+    console.error('Error fetching team:', error);
+    return null;
+  }
+}
+
+export async function createTeam(fields: Team['fields']): Promise<Team> {
+  const record = await base(TABLES.TEAMS).create(fields as unknown as FieldSet);
+  return convertRecord<Team>(record);
+}
+
+export async function updateTeam(id: string, fields: Partial<Team['fields']>): Promise<Team> {
+  const record = await base(TABLES.TEAMS).update(id, fields as unknown as FieldSet);
+  return convertRecord<Team>(record);
+}
+
+export async function deleteTeam(id: string): Promise<void> {
+  await base(TABLES.TEAMS).destroy(id);
+}
+
+// Get active teams only
+export async function getActiveTeams(): Promise<Team[]> {
+  const formula = `{Status} = 'Active'`;
+  const records = await base(TABLES.TEAMS)
+    .select({ filterByFormula: formula })
+    .all();
+  return records.map(convertRecord<Team>);
 }
 
 // ===== DASHBOARD METRICS =====

@@ -26,6 +26,7 @@ export interface Client {
     'First Booking Date'?: string; // Rollup
     'Quotes'?: string[]; // Quote record IDs
     'Preferences'?: string;
+    'Entry Instructions'?: string;
     'Last Booking Date'?: string; // Rollup
     'Is Recurring'?: boolean;
     'Recurrence Frequency'?: 'Weekly' | 'Bi-weekly' | 'Monthly';
@@ -145,6 +146,7 @@ export interface Job {
     'Created Date'?: string;
     'Last Modified'?: string;
     'Quality Score'?: number; // Formula (0-100)
+    'Team'?: string[]; // Team record ID (template used for this job)
   };
 }
 
@@ -284,6 +286,22 @@ export interface CleanerTraining {
     'Graded By'?: 'Sean' | 'Webb';
     'Grading Notes'?: string;
     'Retake Count'?: number;
+  };
+}
+
+export interface Team {
+  id: string;
+  fields: {
+    'Team Name': string;
+    'Members'?: string[]; // Cleaner record IDs
+    'Team Lead'?: string[]; // Single cleaner record ID (optional)
+    'Status'?: 'Active' | 'Inactive';
+    'Notes'?: string;
+    'Member Names'?: string[]; // Lookup from Members.Name
+    'Member Phones'?: string[]; // Lookup from Members.Phone
+    'Member Count'?: number; // Count from Members
+    'Total Hourly Rate'?: number; // Rollup SUM of Members.Hourly Rate
+    'Jobs'?: string[]; // Job record IDs (inverse link)
   };
 }
 

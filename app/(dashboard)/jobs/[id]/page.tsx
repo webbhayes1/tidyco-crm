@@ -3,10 +3,11 @@ import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
 import { DeleteJobButton } from '@/components/DeleteJobButton';
 import { RescheduleButton } from '@/components/RescheduleButton';
-import { getJob } from '@/lib/airtable';
+import { MarkCompleteButton } from '@/components/MarkCompleteButton';
+import { getJob, getClient, getCleaner } from '@/lib/airtable';
 import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
-import { ArrowLeft, Edit } from 'lucide-react';
+import { ArrowLeft, Edit, User, Phone, Mail, MapPin } from 'lucide-react';
 
 // Helper to parse date strings correctly (avoids timezone issues)
 const parseDate = (dateStr: string) => {
@@ -24,6 +25,26 @@ export default async function JobDetailPage({ params }: { params: { id: string }
     notFound();
   }
 
+  // Fetch client and cleaner details
+  const clientId = job.fields.Client?.[0];
+  const cleanerIds = job.fields.Cleaner || [];
+
+  const [client, ...cleaners] = await Promise.all([
+    clientId ? getClient(clientId) : null,
+    ...cleanerIds.map(id => getCleaner(id)),
+  ]);
+
+  // Filter out null cleaners
+  const validCleaners = cleaners.filter(Boolean);
+  const isTeamJob = validCleaners.length > 1;
+
+  // Calculate totals for team jobs
+  const totalHourlyRate = validCleaners.reduce((sum, c) => sum + (c?.fields['Hourly Rate'] || 0), 0);
+  const actualHours = job.fields['Actual Hours'] || job.fields['Duration Hours'] || 0;
+  const tipPerCleaner = isTeamJob && job.fields['Tip Amount']
+    ? job.fields['Tip Amount'] / validCleaners.length
+    : job.fields['Tip Amount'] || 0;
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -33,6 +54,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
 
   const qualityScore = job.fields['Quality Score'] || 0;
   const qualityColor = qualityScore >= 80 ? 'text-green-600' : qualityScore >= 70 ? 'text-yellow-600' : 'text-red-600';
+  const jobTitle = `Job #${job.fields['Job ID'] || job.id.slice(0, 8)}`;
 
   return (
     <div className="space-y-6">
@@ -41,10 +63,17 @@ export default async function JobDetailPage({ params }: { params: { id: string }
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <PageHeader
-          title={`Job #${job.fields['Job ID'] || job.id.slice(0, 8)}`}
+          title={jobTitle}
           description={job.fields.Date ? format(parseDate(job.fields.Date), 'MMMM d, yyyy') : 'No date set'}
           actions={
             <div className="flex gap-2">
+              <MarkCompleteButton
+                jobId={job.id}
+                jobTitle={jobTitle}
+                currentStatus={job.fields.Status}
+                currentTip={job.fields['Tip Amount']}
+                cleanerCount={validCleaners.length}
+              />
               <RescheduleButton
                 jobId={job.id}
                 clientId={job.fields.Client?.[0] || ''}
@@ -59,7 +88,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
               </Link>
               <DeleteJobButton
                 jobId={job.id}
-                jobTitle={`Job #${job.fields['Job ID'] || job.id.slice(0, 8)}`}
+                jobTitle={jobTitle}
               />
             </div>
           }
@@ -109,6 +138,70 @@ export default async function JobDetailPage({ params }: { params: { id: string }
                   </dd>
                 </div>
               </dl>
+            </div>
+          </div>
+
+          {/* Cleaning Checklist */}
+          <div className="bg-white shadow sm:rounded-lg">
+            <div className="px-4 py-5 sm:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Cleaning Checklist</h3>
+                <span className="text-sm text-gray-500">
+                  {job.fields['Checklist Items Completed'] || 0}/{job.fields['Checklist Items Total'] || 0} completed
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {/* Standard checklist items based on service type */}
+                {(() => {
+                  const serviceType = job.fields['Service Type'];
+                  const baseItems = [
+                    'Kitchen - counters & appliances',
+                    'Kitchen - sink & dishes',
+                    'Bathrooms - toilets & showers',
+                    'Bathrooms - sinks & mirrors',
+                    'Bedrooms - dusting & making beds',
+                    'Living areas - dusting & tidying',
+                    'Floors - vacuum/sweep',
+                    'Floors - mop hard surfaces',
+                  ];
+                  const deepCleanItems = [
+                    ...baseItems,
+                    'Inside oven',
+                    'Inside refrigerator',
+                    'Inside cabinets/drawers',
+                    'Baseboards & trim',
+                  ];
+                  const moveOutItems = [
+                    ...deepCleanItems,
+                    'Inside closets',
+                    'Light fixtures',
+                    'Window tracks & sills',
+                  ];
+
+                  const items = serviceType === 'Move-In-Out' ? moveOutItems :
+                               serviceType === 'Deep Clean' ? deepCleanItems : baseItems;
+                  const completed = job.fields['Checklist Items Completed'] || 0;
+
+                  return items.map((item, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <div className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center ${
+                        index < completed
+                          ? 'bg-green-500 border-green-500 text-white'
+                          : 'border-gray-300'
+                      }`}>
+                        {index < completed && (
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </div>
+                      <span className={`text-sm ${index < completed ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
+                        {item}
+                      </span>
+                    </div>
+                  ));
+                })()}
+              </div>
             </div>
           </div>
 
@@ -222,6 +315,144 @@ export default async function JobDetailPage({ params }: { params: { id: string }
 
         {/* Sidebar */}
         <div className="space-y-6">
+          {/* Client Info */}
+          {client && (
+            <div className="bg-white shadow sm:rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base font-medium text-gray-900">Client</h3>
+                  <Link href={`/clients/${client.id}`} className="text-sm text-blue-600 hover:text-blue-800">
+                    View Profile
+                  </Link>
+                </div>
+                <dl className="space-y-3">
+                  <div className="flex items-start gap-2">
+                    <User className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                    <span className="text-sm text-gray-900">{client.fields.Name}</span>
+                  </div>
+                  {client.fields.Phone && (
+                    <div className="flex items-start gap-2">
+                      <Phone className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <a href={`tel:${client.fields.Phone}`} className="text-sm text-blue-600 hover:text-blue-800">
+                        {client.fields.Phone}
+                      </a>
+                    </div>
+                  )}
+                  {client.fields.Email && (
+                    <div className="flex items-start gap-2">
+                      <Mail className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <a href={`mailto:${client.fields.Email}`} className="text-sm text-blue-600 hover:text-blue-800 break-all">
+                        {client.fields.Email}
+                      </a>
+                    </div>
+                  )}
+                  {client.fields.Address && (
+                    <div className="flex items-start gap-2">
+                      <MapPin className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-gray-900">{client.fields.Address}</span>
+                    </div>
+                  )}
+                </dl>
+                {client.fields['Entry Instructions'] && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <dt className="text-sm font-medium text-gray-500 mb-1">Entry Instructions</dt>
+                    <dd className="text-sm text-gray-900 whitespace-pre-wrap">{client.fields['Entry Instructions']}</dd>
+                  </div>
+                )}
+                {client.fields.Preferences && (
+                  <div className={`${client.fields['Entry Instructions'] ? 'mt-3' : 'mt-4 pt-4 border-t border-gray-200'}`}>
+                    <dt className="text-sm font-medium text-gray-500 mb-1">Client Preferences</dt>
+                    <dd className="text-sm text-gray-900 whitespace-pre-wrap">{client.fields.Preferences}</dd>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Cleaner(s) Info */}
+          {validCleaners.length > 0 && (
+            <div className="bg-white shadow sm:rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <h3 className="text-base font-medium text-gray-900 mb-4">
+                  {isTeamJob ? `Cleaners (${validCleaners.length})` : 'Cleaner'}
+                </h3>
+                <div className="space-y-4">
+                  {validCleaners.map((cleaner, index) => {
+                    const cleanerHourlyRate = cleaner?.fields['Hourly Rate'] || 0;
+                    const cleanerBasePay = cleanerHourlyRate * actualHours;
+                    const cleanerTip = tipPerCleaner;
+                    const cleanerTotal = cleanerBasePay + cleanerTip;
+
+                    return (
+                      <div key={cleaner?.id || index} className={`${index > 0 ? 'pt-4 border-t border-gray-200' : ''}`}>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4 text-gray-400" />
+                            <span className="font-medium text-gray-900">{cleaner?.fields.Name}</span>
+                          </div>
+                          <Link href={`/cleaners/${cleaner?.id}`} className="text-sm text-blue-600 hover:text-blue-800">
+                            View Profile
+                          </Link>
+                        </div>
+                        <dl className="space-y-2 text-sm">
+                          {cleaner?.fields.Phone && (
+                            <div className="flex items-start gap-2">
+                              <Phone className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                              <a href={`tel:${cleaner.fields.Phone}`} className="text-blue-600 hover:text-blue-800">
+                                {cleaner.fields.Phone}
+                              </a>
+                            </div>
+                          )}
+                          {cleaner?.fields.Email && (
+                            <div className="flex items-start gap-2">
+                              <Mail className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                              <a href={`mailto:${cleaner.fields.Email}`} className="text-blue-600 hover:text-blue-800 break-all">
+                                {cleaner.fields.Email}
+                              </a>
+                            </div>
+                          )}
+                        </dl>
+                        <div className="mt-3 pt-3 border-t border-gray-100 space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-500">Rate</span>
+                            <span className="text-gray-900">{formatCurrency(cleanerHourlyRate)}/hr</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-500">Base Pay</span>
+                            <span className="text-gray-900">{formatCurrency(cleanerBasePay)}</span>
+                          </div>
+                          {(job.fields['Tip Amount'] || 0) > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-500">Tip{isTeamJob ? ' (split)' : ''}</span>
+                              <span className="text-gray-900">{formatCurrency(cleanerTip)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-sm font-semibold pt-1">
+                            <span className="text-gray-700">Payout</span>
+                            <span className="text-green-600">{formatCurrency(cleanerTotal)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {isTeamJob && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="flex justify-between text-sm font-semibold">
+                      <span className="text-gray-900">Total Team Payout</span>
+                      <span className="text-green-600">{formatCurrency(job.fields['Total Cleaner Payout'] || 0)}</span>
+                    </div>
+                    {(job.fields['Tip Amount'] || 0) > 0 && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        Tip of {formatCurrency(job.fields['Tip Amount'] || 0)} split evenly between {validCleaners.length} cleaners
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Payment Status */}
           <div className="bg-white shadow sm:rounded-lg">
             <div className="px-4 py-5 sm:p-6">

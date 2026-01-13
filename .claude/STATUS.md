@@ -1,8 +1,8 @@
 # Custom Next.js Portal - Status
 
 **Last Updated**: 2026-01-13
-**Session**: 8 (Reschedule Feature, Name Split, Pricing Calculations)
-**Progress**: Deployed to Production (~92% complete)
+**Session**: 11 (Teams Feature - Multi-Cleaner Support)
+**Progress**: Deployed to Production (~95% complete)
 **Production URL**: https://tidyco-crm.vercel.app
 **GitHub Repo**: https://github.com/webbhayes1/tidyco-crm
 
@@ -10,7 +10,7 @@
 
 ## Current State: DEPLOYED TO VERCEL ✅
 
-The Custom CRM is now **deployed to Vercel** at https://tidyco-crm.vercel.app. Clerk authentication was temporarily removed to resolve deployment issues. Session 7 fixed calendar time parsing, timezone bugs, and added auto-recurring job generation + cascade deletes.
+The Custom CRM is now **deployed to Vercel** at https://tidyco-crm.vercel.app. Clerk authentication was temporarily removed to resolve deployment issues. Session 11 added Teams feature for multi-cleaner jobs with full CRUD, team templates, and per-job flexibility.
 
 ### ✅ Phase 1: Foundation - COMPLETE
 - [x] Next.js 14 project initialized with TypeScript
@@ -172,24 +172,29 @@ custom/
 ├── app/
 │   ├── (auth)/              - Sign-in/sign-up pages
 │   ├── (dashboard)/         - Main app pages
-│   │   ├── page.tsx         - Dashboard ✅ FIXED
+│   │   ├── page.tsx         - Dashboard ✅
 │   │   ├── jobs/            - Jobs CRUD ✅
 │   │   ├── clients/         - Clients CRUD ✅
 │   │   ├── cleaners/        - Cleaners CRUD ✅
-│   │   └── calendar/        - Calendar views ✅ POLISHED
+│   │   │   ├── layout.tsx   - Tab nav (Cleaners | Teams) ✅ NEW
+│   │   │   └── teams/       - Teams CRUD ✅ NEW (Session 11)
+│   │   └── calendar/        - Calendar views ✅
 │   └── api/                 - API routes ✅
+│       └── teams/           - Teams API ✅ NEW
 ├── components/
-│   ├── DataTable.tsx        - ✅ FIXED (Session 5)
-│   ├── UpcomingJobsTable.tsx - ✅ NEW (Session 5)
+│   ├── DataTable.tsx        - ✅
+│   ├── UpcomingJobsTable.tsx - ✅
 │   ├── Navigation.tsx       - ✅
 │   ├── PageHeader.tsx       - ✅
-│   ├── JobForm.tsx          - ✅
+│   ├── JobForm.tsx          - ✅ REWRITTEN (multi-cleaner)
+│   ├── TeamForm.tsx         - ✅ NEW (Session 11)
+│   ├── MarkCompleteButton.tsx - ✅ (tip split support)
 │   ├── ClientForm.tsx       - ✅
 │   └── CleanerForm.tsx      - ✅
 ├── lib/
-│   └── airtable.ts          - Airtable client ✅
+│   └── airtable.ts          - Airtable client ✅ (team functions)
 └── types/
-    └── airtable.ts          - TypeScript types ✅
+    └── airtable.ts          - TypeScript types ✅ (Team interface)
 ```
 
 ### Design System
@@ -223,6 +228,36 @@ custom/
 ---
 
 ## Session History
+
+### Session 11 (2026-01-13): Teams Feature - Multi-Cleaner Support ✅
+- **Teams table created in Airtable** (tblBO0GPVEy3tOl7a)
+  - Team Name, Members, Team Lead, Status, Notes
+  - Lookup/Rollup fields: Member Names, Phones, Count, Total Hourly Rate
+- **Teams as subtab under Cleaners** (per user request)
+  - Created layout.tsx with tab navigation
+  - Full CRUD pages at /cleaners/teams/*
+- **JobForm completely rewritten** for multi-cleaner support
+  - Assignment type toggle: Individual vs Team
+  - Team selection auto-populates cleaners (editable per-job)
+  - Multi-select checkboxes for individual cleaners
+  - Combined hourly rate preview
+- **Job detail page updated** for multiple cleaners
+  - Shows all cleaners with individual payouts
+  - Per-cleaner: Rate, Base Pay, Tip (split), Total
+  - Team summary with total payout
+- **MarkCompleteButton** shows tip split for team jobs
+- **Jobs list** shows "2 cleaners" with names preview
+- **Business rules implemented**:
+  - Each cleaner gets FULL hourly rate (not split)
+  - Tips split evenly between cleaners
+  - Teams are templates with per-job flexibility
+
+### Session 10 (2026-01-13): Job Detail Enhancements, Leads Planning ✅
+- Mark Complete with tip input modal
+- Client/cleaner info sections with contact details
+- Cleaning checklist by service type
+- Entry Instructions field (Airtable + CRM)
+- Leads section planned (see .claude/plan/leads-section.md)
 
 ### Session 8 (2026-01-13): Reschedule Feature, Name Split, Pricing Calculations ✅
 - **Reschedule feature completed** - Added RescheduleButton to job detail page
@@ -350,6 +385,6 @@ AIRTABLE_BASE_ID=appfisQaCpwJLlSyx
 
 ---
 
-**Status**: 🟢 **DEPLOYED TO PRODUCTION - 92% COMPLETE**
+**Status**: 🟢 **DEPLOYED TO PRODUCTION - 95% COMPLETE**
 
-The Custom CRM is deployed to Vercel at https://tidyco-crm.vercel.app and ready for business use. Session 8 added reschedule functionality, First Name/Last Name fields for personalized auto-texts, and improved pricing/duration calculations for recurring jobs. Clerk authentication is temporarily disabled and will be re-enabled by user.
+The Custom CRM is deployed to Vercel at https://tidyco-crm.vercel.app and ready for business use. Session 11 added Teams feature for multi-cleaner jobs - teams are subtab under Cleaners, JobForm supports team selection with per-job flexibility, each cleaner gets full hourly rate, tips split evenly. Clerk authentication is temporarily disabled and will be re-enabled by user.
