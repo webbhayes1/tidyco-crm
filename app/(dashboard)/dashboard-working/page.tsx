@@ -45,10 +45,10 @@ export default async function WorkingDashboardPage() {
               <div className="flex-1">
                 <dt className="text-sm font-medium text-gray-500 truncate">This Week</dt>
                 <dd className="mt-1 text-3xl font-semibold tracking-tight text-tidyco-navy">
-                  {metrics.upcomingJobsCount}
+                  {metrics.thisWeekJobsCount}
                 </dd>
                 <p className="mt-1 text-sm text-gray-500">
-                  {formatCurrency(metrics.upcomingJobsRevenue)}
+                  {formatCurrency(metrics.thisWeekRevenue)}
                 </p>
               </div>
               <div className="flex-shrink-0">
@@ -63,7 +63,7 @@ export default async function WorkingDashboardPage() {
               <div className="flex-1">
                 <dt className="text-sm font-medium text-gray-500 truncate">Monthly Revenue</dt>
                 <dd className="mt-1 text-3xl font-semibold tracking-tight text-tidyco-navy">
-                  {formatCurrency(metrics.monthlyRevenue)}
+                  {formatCurrency(metrics.expectedMonthlyRevenue)}
                 </dd>
               </div>
               <div className="flex-shrink-0">
@@ -167,7 +167,7 @@ export default async function WorkingDashboardPage() {
         <div className="bg-green-50 p-4 rounded-lg border border-green-200">
           <p className="text-green-800 font-medium">✅ Dashboard loaded successfully!</p>
           <p className="text-sm text-green-700 mt-1">
-            Showing {metrics.upcomingJobsCount} jobs, {metrics.activeClientsCount} clients, {metrics.activeCleanersCount} cleaners
+            Showing {metrics.thisMonthJobsCount} jobs, {metrics.activeClientsCount} clients, {metrics.activeCleanersCount} cleaners
           </p>
         </div>
       </div>
