@@ -2,10 +2,20 @@ import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
 import { DeleteJobButton } from '@/components/DeleteJobButton';
+import { RescheduleButton } from '@/components/RescheduleButton';
 import { getJob } from '@/lib/airtable';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
 import { ArrowLeft, Edit } from 'lucide-react';
+
+// Helper to parse date strings correctly (avoids timezone issues)
+const parseDate = (dateStr: string) => {
+  if (!dateStr) return new Date();
+  if (dateStr.length === 10) {
+    return new Date(dateStr + 'T12:00:00');
+  }
+  return parseISO(dateStr);
+};
 
 export default async function JobDetailPage({ params }: { params: { id: string } }) {
   const job = await getJob(params.id);
@@ -32,9 +42,14 @@ export default async function JobDetailPage({ params }: { params: { id: string }
         </Link>
         <PageHeader
           title={`Job #${job.fields['Job ID'] || job.id.slice(0, 8)}`}
-          description={job.fields.Date ? format(new Date(job.fields.Date), 'MMMM d, yyyy') : 'No date set'}
+          description={job.fields.Date ? format(parseDate(job.fields.Date), 'MMMM d, yyyy') : 'No date set'}
           actions={
             <div className="flex gap-2">
+              <RescheduleButton
+                jobId={job.id}
+                clientId={job.fields.Client?.[0] || ''}
+                currentDate={job.fields.Date || ''}
+              />
               <Link
                 href={`/jobs/${job.id}/edit`}
                 className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
@@ -72,7 +87,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
                 <div>
                   <dt className="text-sm font-medium text-gray-500">Date & Time</dt>
                   <dd className="mt-1 text-sm text-gray-900">
-                    {job.fields.Date && format(new Date(job.fields.Date), 'MMMM d, yyyy')}
+                    {job.fields.Date && format(parseDate(job.fields.Date), 'MMMM d, yyyy')}
                     {job.fields.Time && ` at ${job.fields.Time}`}
                   </dd>
                 </div>
@@ -219,7 +234,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
                   </dd>
                   {job.fields['Client Paid Date'] && (
                     <dd className="mt-1 text-xs text-gray-500">
-                      Paid on {format(new Date(job.fields['Client Paid Date']), 'MMM d, yyyy')}
+                      Paid on {format(parseDate(job.fields['Client Paid Date']), 'MMM d, yyyy')}
                     </dd>
                   )}
                 </div>
@@ -234,7 +249,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
                   </dd>
                   {job.fields['Cleaner Paid Date'] && (
                     <dd className="mt-1 text-xs text-gray-500">
-                      Paid on {format(new Date(job.fields['Cleaner Paid Date']), 'MMM d, yyyy')}
+                      Paid on {format(parseDate(job.fields['Cleaner Paid Date']), 'MMM d, yyyy')}
                     </dd>
                   )}
                 </div>

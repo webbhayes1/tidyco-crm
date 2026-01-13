@@ -66,10 +66,10 @@ export default async function WorkingDashboardPage() {
               <div className="flex-1">
                 <dt className="text-sm font-medium text-gray-500 truncate">This Week</dt>
                 <dd className="mt-1 text-3xl font-semibold tracking-tight text-tidyco-navy">
-                  {metrics.upcomingJobsCount}
+                  {metrics.thisWeekJobsCount}
                 </dd>
                 <p className="mt-1 text-sm text-gray-500">
-                  {formatCurrency(metrics.upcomingJobsRevenue)}
+                  {formatCurrency(metrics.thisWeekRevenue)}
                 </p>
               </div>
               <div className="flex-shrink-0">
@@ -79,19 +79,24 @@ export default async function WorkingDashboardPage() {
           </div>
 
           {/* Monthly Revenue */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-5 sm:p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <dt className="text-sm font-medium text-gray-500 truncate">Monthly Revenue</dt>
-                <dd className="mt-1 text-3xl font-semibold tracking-tight text-tidyco-navy">
-                  {formatCurrency(metrics.monthlyRevenue)}
-                </dd>
-              </div>
-              <div className="flex-shrink-0">
-                <DollarSign className="h-8 w-8 text-tidyco-blue" />
+          <Link href="/finances" className="block">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-5 sm:p-6 hover:border-tidyco-blue hover:shadow-md transition-all cursor-pointer">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <dt className="text-sm font-medium text-gray-500 truncate">Monthly Revenue</dt>
+                  <dd className="mt-1 text-3xl font-semibold tracking-tight text-tidyco-navy">
+                    {formatCurrency(metrics.expectedMonthlyRevenue)}
+                  </dd>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {metrics.thisMonthJobsCount} jobs scheduled
+                  </p>
+                </div>
+                <div className="flex-shrink-0">
+                  <DollarSign className="h-8 w-8 text-tidyco-blue" />
+                </div>
               </div>
             </div>
-          </div>
+          </Link>
 
           {/* Active Clients */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-5 sm:p-6">
@@ -143,13 +148,6 @@ export default async function WorkingDashboardPage() {
           />
         </div>
 
-        {/* Success Message */}
-        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-          <p className="text-green-800 font-medium">✅ Dashboard loaded successfully!</p>
-          <p className="text-sm text-green-700 mt-1">
-            Showing {metrics.upcomingJobsCount} jobs, {metrics.activeClientsCount} clients, {metrics.activeCleanersCount} cleaners
-          </p>
-        </div>
       </div>
     );
   } catch (error: any) {

@@ -1,8 +1,10 @@
 # TidyCo CRM - Custom Build Handoff Document
 
-**Last Updated:** 2026-01-09
-**Project Status:** 75% Complete - Core functionality working, CRUD operations pending
+**Last Updated:** 2026-01-12
+**Project Status:** 85% Complete - Core functionality working, deployed to Vercel
 **Development Server:** http://localhost:3000
+**Production URL:** https://tidyco-crm.vercel.app
+**GitHub Repo:** https://github.com/webbhayes1/tidyco-crm
 
 ---
 
@@ -146,6 +148,43 @@ This overrides .env.local, so both must match!
 ### Issue 4: Empty Job Records (FIXED)
 **Problem:** 5 job records with only computed fields, no real data
 **Solution:** Deleted empty records, created 4 real jobs with actual dates/times/clients
+
+### Issue 5: Vercel Deployment 500 Errors (FIXED - 2026-01-12)
+**Problem:** Clerk middleware causing `MIDDLEWARE_INVOCATION_FAILED` errors on Vercel
+**Solution:**
+- Removed middleware.ts entirely
+- Removed @clerk/nextjs from package.json dependencies
+- Commented out ClerkProvider in app/layout.tsx
+- Commented out UserButton in components/Navigation.tsx
+- Deleted sign-in and sign-up pages
+- Re-imported project fresh in Vercel with only Airtable env vars
+
+---
+
+## 🌐 Vercel Deployment
+
+**Production URL:** https://tidyco-crm.vercel.app
+**GitHub Repo:** https://github.com/webbhayes1/tidyco-crm
+**Status:** Deployed and working (2026-01-12)
+
+### Vercel Environment Variables (Required)
+```
+AIRTABLE_API_KEY=patBAltZnF2grQ7t0.4170a8a543fcdbb14f57c2e329c3a6a4e85841dec8ff8da9e51575e3865ec88a
+AIRTABLE_BASE_ID=appfisQaCpwJLlSyx
+```
+
+### To Re-enable Clerk Authentication
+1. Install Clerk: `npm install @clerk/nextjs`
+2. Create middleware.ts with `clerkMiddleware()`
+3. Uncomment ClerkProvider in app/layout.tsx
+4. Uncomment UserButton in components/Navigation.tsx
+5. Recreate sign-in/sign-up pages
+6. Add Clerk env vars to Vercel:
+   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+   - `CLERK_SECRET_KEY`
+   - `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`
+   - `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`
+7. Redeploy
 
 ---
 
@@ -381,10 +420,10 @@ Complete CRUD portal where users can:
 - ⏳ Create/edit clients
 - ⏳ Create/edit cleaners
 - ⏳ Manage quotes
-- ⏳ (Optional) Deploy to Vercel
-- ⏳ (Optional) Enable authentication
+- ✅ Deploy to Vercel (completed 2026-01-12)
+- ⏳ Enable Clerk authentication (user will add later)
 
-**Estimated Completion:** ~25% remaining work (mostly CRUD operations)
+**Estimated Completion:** ~15% remaining work (mostly CRUD operations)
 
 ---
 

@@ -3,9 +3,20 @@ import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
 import { DeleteButton } from '@/components/DeleteButton';
 import { getClient, getJobs } from '@/lib/airtable';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
-import { ArrowLeft, Edit, Mail, Phone, MapPin, Star } from 'lucide-react';
+import { ArrowLeft, Edit, Mail, Phone, MapPin, Star, Calendar, Clock, DollarSign } from 'lucide-react';
+
+// Helper to parse date strings correctly (avoids timezone issues)
+// Adding T12:00:00 ensures the date displays correctly in any timezone
+const parseDate = (dateStr: string) => {
+  if (!dateStr) return new Date();
+  // If it's just a date (YYYY-MM-DD), add noon time to avoid timezone shifts
+  if (dateStr.length === 10) {
+    return new Date(dateStr + 'T12:00:00');
+  }
+  return parseISO(dateStr);
+};
 
 export default async function ClientDetailPage({ params }: { params: { id: string } }) {
   const client = await getClient(params.id);
@@ -19,10 +30,41 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
   const clientJobs = allJobs.filter(job =>
     job.fields.Client?.includes(params.id)
   ).sort((a, b) => {
-    const dateA = a.fields.Date ? new Date(a.fields.Date).getTime() : 0;
-    const dateB = b.fields.Date ? new Date(b.fields.Date).getTime() : 0;
-    return dateB - dateA; // Most recent first
+    const dateA = a.fields.Date ? parseDate(a.fields.Date).getTime() : 0;
+    const dateB = b.fields.Date ? parseDate(b.fields.Date).getTime() : 0;
+    return dateA - dateB; // Oldest/soonest first, most future at bottom
   });
+
+  // Split jobs into upcoming and past
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Upcoming jobs (future, not cancelled) - sorted soonest first
+  const upcomingJobs = clientJobs
+    .filter(job => {
+      if (!job.fields.Date) return false;
+      const jobDate = parseDate(job.fields.Date);
+      return jobDate >= today && job.fields.Status !== 'Cancelled';
+    })
+    .sort((a, b) => {
+      const dateA = parseDate(a.fields.Date!).getTime();
+      const dateB = parseDate(b.fields.Date!).getTime();
+      return dateA - dateB; // Soonest first
+    });
+  const nextJob = upcomingJobs[0];
+
+  // Past jobs (before today or completed) - sorted most recent first
+  const pastJobs = clientJobs
+    .filter(job => {
+      if (!job.fields.Date) return false;
+      const jobDate = parseDate(job.fields.Date);
+      return jobDate < today || job.fields.Status === 'Completed';
+    })
+    .sort((a, b) => {
+      const dateA = parseDate(a.fields.Date!).getTime();
+      const dateB = parseDate(b.fields.Date!).getTime();
+      return dateB - dateA; // Most recent first
+    });
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -39,7 +81,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
         </Link>
         <PageHeader
           title={client.fields.Name}
-          description={`Client since ${client.fields['First Booking Date'] ? format(new Date(client.fields['First Booking Date']), 'MMMM yyyy') : 'Unknown'}`}
+          description={`Client since ${client.fields['First Booking Date'] ? format(parseDate(client.fields['First Booking Date']), 'MMMM yyyy') : 'Unknown'}`}
           actions={
             <div className="flex gap-2">
               <Link
@@ -132,13 +174,66 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
             </div>
           </div>
 
-          {/* Booking History */}
+          {/* Upcoming Bookings */}
           <div className="bg-white shadow sm:rounded-lg">
             <div className="px-4 py-5 sm:p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Booking History ({clientJobs.length})
+                Upcoming Bookings ({upcomingJobs.length})
               </h3>
-              {clientJobs.length > 0 ? (
+              {upcomingJobs.length > 0 ? (
+                <div className="overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Date
+                        </th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Service
+                        </th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Amount
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {upcomingJobs.map((job) => (
+                        <tr key={job.id} className="hover:bg-gray-50">
+                          <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <Link href={`/jobs/${job.id}`} className="text-primary-600 hover:text-primary-500">
+                              {job.fields.Date ? format(parseDate(job.fields.Date!), 'MMM d, yyyy') : '-'}
+                            </Link>
+                          </td>
+                          <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {job.fields['Service Type']}
+                          </td>
+                          <td className="px-3 py-4 whitespace-nowrap">
+                            <StatusBadge status={job.fields.Status} />
+                          </td>
+                          <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatCurrency(job.fields['Amount Charged'] || 0)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">No upcoming bookings</p>
+              )}
+            </div>
+          </div>
+
+          {/* Booking History (Past) */}
+          <div className="bg-white shadow sm:rounded-lg">
+            <div className="px-4 py-5 sm:p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                Booking History ({pastJobs.length})
+              </h3>
+              {pastJobs.length > 0 ? (
                 <div className="overflow-hidden">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
@@ -161,11 +256,11 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {clientJobs.map((job) => (
+                      {pastJobs.map((job) => (
                         <tr key={job.id} className="hover:bg-gray-50">
                           <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
                             <Link href={`/jobs/${job.id}`} className="text-primary-600 hover:text-primary-500">
-                              {job.fields.Date ? format(new Date(job.fields.Date), 'MMM d, yyyy') : '-'}
+                              {job.fields.Date ? format(parseDate(job.fields.Date!), 'MMM d, yyyy') : '-'}
                             </Link>
                           </td>
                           <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -193,7 +288,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
                   </table>
                 </div>
               ) : (
-                <p className="text-sm text-gray-500">No bookings yet</p>
+                <p className="text-sm text-gray-500">No past bookings</p>
               )}
             </div>
           </div>
@@ -221,6 +316,118 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
 
         {/* Sidebar */}
         <div className="space-y-6">
+          {/* Cleaning Schedule */}
+          <div className="bg-white shadow sm:rounded-lg">
+            <div className="px-4 py-5 sm:p-6">
+              <h3 className="text-base font-medium text-gray-900 mb-4 flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-tidyco-blue" />
+                Cleaning Schedule
+              </h3>
+
+              {client.fields['Is Recurring'] ? (
+                <div className="space-y-4">
+                  {/* Recurring Schedule */}
+                  <div className="bg-blue-50 p-3 rounded-lg">
+                    <p className="text-sm font-medium text-blue-800">
+                      {client.fields['Recurrence Frequency'] || 'Recurring'}
+                    </p>
+                    <p className="text-sm text-blue-700">
+                      {client.fields['Recurring Days'] || client.fields['Recurring Day'] || 'Days not set'}
+                    </p>
+                    {(client.fields['Recurring Start Time'] || client.fields['Recurring End Time']) && (
+                      <p className="text-sm text-blue-600 flex items-center gap-1 mt-1">
+                        <Clock className="h-3 w-3" />
+                        {client.fields['Recurring Start Time']} - {client.fields['Recurring End Time']}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Next Scheduled Cleaning */}
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase mb-2">Next Cleaning</p>
+                    {nextJob ? (
+                      <div className="border border-gray-200 rounded-lg p-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-gray-900">
+                              {format(parseDate(nextJob.fields.Date!), 'EEEE, MMM d')}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {nextJob.fields.Time}
+                              {nextJob.fields['Amount Charged'] && ` • ${formatCurrency(nextJob.fields['Amount Charged'])}`}
+                            </p>
+                          </div>
+                          <Link
+                            href={`/jobs/${nextJob.id}/edit`}
+                            className="text-tidyco-blue hover:text-tidyco-navy text-sm font-medium"
+                          >
+                            Edit
+                          </Link>
+                        </div>
+                        <div className="mt-2 flex gap-2">
+                          <StatusBadge status={nextJob.fields.Status} />
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">No upcoming cleanings scheduled</p>
+                    )}
+                  </div>
+
+                  {/* Upcoming Jobs List */}
+                  {upcomingJobs.length > 1 && (
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase mb-2">
+                        More Upcoming ({upcomingJobs.length - 1})
+                      </p>
+                      <div className="space-y-2">
+                        {upcomingJobs.slice(1, 4).map(job => (
+                          <Link
+                            key={job.id}
+                            href={`/jobs/${job.id}`}
+                            className="block text-sm text-gray-600 hover:text-tidyco-blue"
+                          >
+                            {format(parseDate(job.fields.Date!), 'MMM d')} - {job.fields.Time}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">No recurring schedule set</p>
+              )}
+            </div>
+          </div>
+
+          {/* Pricing */}
+          {(client.fields['Pricing Type'] || client.fields['Charge Per Cleaning'] || client.fields['Client Hourly Rate']) && (
+            <div className="bg-white shadow sm:rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <h3 className="text-base font-medium text-gray-900 mb-4 flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-green-600" />
+                  Pricing
+                </h3>
+                <div className="bg-green-50 p-3 rounded-lg">
+                  {client.fields['Pricing Type'] === 'Hourly Rate' ? (
+                    <>
+                      <p className="text-sm font-medium text-green-800">Hourly Rate</p>
+                      <p className="text-2xl font-bold text-green-700">
+                        {formatCurrency(client.fields['Client Hourly Rate'] || 0)}/hr
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm font-medium text-green-800">Per Cleaning</p>
+                      <p className="text-2xl font-bold text-green-700">
+                        {formatCurrency(client.fields['Charge Per Cleaning'] || 0)}
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Client Status */}
           <div className="bg-white shadow sm:rounded-lg">
             <div className="px-4 py-5 sm:p-6">
@@ -228,7 +435,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
               <StatusBadge status={client.fields.Status || 'Active'} />
               {client.fields['Last Booking Date'] && (
                 <p className="mt-2 text-sm text-gray-500">
-                  Last booking: {format(new Date(client.fields['Last Booking Date']), 'MMM d, yyyy')}
+                  Last booking: {format(parseDate(client.fields['Last Booking Date']!), 'MMM d, yyyy')}
                 </p>
               )}
             </div>

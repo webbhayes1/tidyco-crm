@@ -14,6 +14,26 @@ interface EnrichedJob extends Job {
 
 const HOURS = Array.from({ length: 13 }, (_, i) => i + 7); // 7am to 7pm
 
+// Parse time string (handles both "10:00 AM" and "14:00" formats)
+const parseTimeToHour = (timeStr: string): number => {
+  if (!timeStr) return 0;
+
+  // Check for AM/PM format
+  const isPM = timeStr.toLowerCase().includes('pm');
+  const isAM = timeStr.toLowerCase().includes('am');
+
+  // Remove AM/PM and trim
+  const cleanTime = timeStr.replace(/\s*(am|pm)\s*/i, '').trim();
+  const [hoursStr] = cleanTime.split(':');
+  let hours = parseInt(hoursStr, 10);
+
+  // Convert 12-hour to 24-hour
+  if (isPM && hours !== 12) hours += 12;
+  if (isAM && hours === 12) hours = 0;
+
+  return hours;
+};
+
 const CLEANER_COLORS: Record<string, string> = {
   'Alice': '#4285F4',
   'Bob': '#0B8043',
@@ -62,7 +82,7 @@ export default function CalendarWeeklyPage() {
 
     const startTime = job.fields.Time;
     if (startTime) {
-      const [hours] = startTime.split(':').map(Number);
+      const hours = parseTimeToHour(startTime);
       const hourMap = jobsByDayHour.get(dayKey)!;
 
       if (!hourMap.has(hours)) {

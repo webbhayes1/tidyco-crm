@@ -4,9 +4,13 @@ export interface Client {
   id: string;
   fields: {
     'Name': string;
+    'First Name'?: string;
+    'Last Name'?: string;
     'Email': string;
     'Phone': string;
     'Address': string;
+    'City'?: string;
+    'State'?: string;
     'Zip Code'?: string;
     'Owner'?: 'Sean' | 'Webb';
     'Lead Source'?: 'Angi' | 'Referral' | 'Direct' | 'Other';
@@ -23,6 +27,18 @@ export interface Client {
     'Quotes'?: string[]; // Quote record IDs
     'Preferences'?: string;
     'Last Booking Date'?: string; // Rollup
+    'Is Recurring'?: boolean;
+    'Recurrence Frequency'?: 'Weekly' | 'Bi-weekly' | 'Monthly';
+    'Recurring Day'?: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
+    'Recurring Days'?: string; // Comma-separated days like "Monday, Tuesday, Wednesday"
+    'Recurring Start Time'?: string;
+    'Recurring End Time'?: string;
+    'First Cleaning Date'?: string; // When the recurring schedule starts
+    'Pricing Type'?: 'Hourly Rate' | 'Per Cleaning';
+    'Client Hourly Rate'?: number;
+    'Charge Per Cleaning'?: number;
+    'Bedrooms'?: number;
+    'Bathrooms'?: number;
     'Created Date'?: string;
   };
 }
@@ -57,6 +73,7 @@ export interface Cleaner {
     'Average Quality Score'?: number; // Rollup
     'Jobs Below 70 Score'?: number; // Rollup
     'Experience Level'?: 'Junior' | 'Mid-Level' | 'Senior';
+    'Language'?: 'English' | 'Spanish' | 'Both';
     'Created Date'?: string;
   };
 }

@@ -9,9 +9,57 @@ interface ClientFormProps {
   onCancel: () => void;
 }
 
+// Days of the week
+const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
+
+// Time options for schedule
+const TIME_OPTIONS = [
+  '6:00 AM', '6:30 AM', '7:00 AM', '7:30 AM', '8:00 AM', '8:30 AM',
+  '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
+  '12:00 PM', '12:30 PM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM',
+  '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM', '5:00 PM', '5:30 PM',
+  '6:00 PM', '6:30 PM', '7:00 PM', '7:30 PM', '8:00 PM'
+];
+
+// Common cities in the service area
+const CITY_SUGGESTIONS = [
+  'Manhattan Beach',
+  'Hermosa Beach',
+  'Redondo Beach',
+  'El Segundo',
+  'Torrance',
+  'Palos Verdes',
+  'Rancho Palos Verdes',
+  'Rolling Hills',
+  'Rolling Hills Estates',
+  'Hawthorne',
+  'Gardena',
+  'Carson',
+  'Long Beach',
+  'San Pedro',
+  'Lomita',
+  'Los Angeles',
+  'Inglewood',
+  'Culver City',
+  'Marina del Rey',
+  'Playa del Rey',
+  'Venice',
+  'Santa Monica',
+];
+
+// Format phone number as (XXX) XXX-XXXX
+function formatPhoneNumber(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length === 0) return '';
+  if (digits.length <= 3) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+}
+
 export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
   const [loading, setLoading] = useState(false);
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
+  const [showCitySuggestions, setShowCitySuggestions] = useState(false);
 
   // Fetch cleaners for dropdown
   useEffect(() => {
@@ -21,18 +69,52 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
       .catch(err => console.error('Failed to load cleaners:', err));
   }, []);
 
+  // Helper to parse existing name into first/last
+  const parseExistingName = () => {
+    if (client?.fields['First Name']) {
+      return {
+        firstName: client.fields['First Name'],
+        lastName: client.fields['Last Name'] || ''
+      };
+    }
+    // Fall back to splitting the Name field
+    const fullName = client?.fields.Name || '';
+    const parts = fullName.trim().split(' ');
+    return {
+      firstName: parts[0] || '',
+      lastName: parts.slice(1).join(' ') || ''
+    };
+  };
+
+  const { firstName: initialFirstName, lastName: initialLastName } = parseExistingName();
+
   // Form state
   const [formData, setFormData] = useState({
-    name: client?.fields.Name || '',
+    firstName: initialFirstName,
+    lastName: initialLastName,
     email: client?.fields.Email || '',
     phone: client?.fields.Phone || '',
     address: client?.fields.Address || '',
+    city: client?.fields.City || '',
+    state: client?.fields.State || 'CA',
     zipCode: client?.fields['Zip Code'] || '',
     status: client?.fields.Status || 'Active',
     owner: client?.fields.Owner || '',
     preferredCleaner: client?.fields['Preferred Cleaner']?.[0] || '',
     leadSource: client?.fields['Lead Source'] || '',
     preferredPaymentMethod: client?.fields['Preferred Payment Method'] || '',
+    isRecurring: client?.fields['Is Recurring'] || false,
+    recurrenceFrequency: client?.fields['Recurrence Frequency'] || '',
+    recurringDay: client?.fields['Recurring Day'] || '',
+    recurringDays: client?.fields['Recurring Days']?.split(', ') || [],
+    recurringStartTime: client?.fields['Recurring Start Time'] || '8:00 AM',
+    recurringEndTime: client?.fields['Recurring End Time'] || '11:00 AM',
+    firstCleaningDate: client?.fields['First Cleaning Date'] || '',
+    pricingType: client?.fields['Pricing Type'] || 'Per Cleaning',
+    clientHourlyRate: client?.fields['Client Hourly Rate'] || 35,
+    chargePerCleaning: client?.fields['Charge Per Cleaning'] || 150,
+    bedrooms: client?.fields['Bedrooms'] || 3,
+    bathrooms: client?.fields['Bathrooms'] || 2,
     preferences: client?.fields.Preferences || '',
     notes: client?.fields.Notes || '',
   });
@@ -42,11 +124,20 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
     setLoading(true);
 
     try {
+      // Combine first and last name into full name
+      const fullName = formData.lastName
+        ? `${formData.firstName} ${formData.lastName}`.trim()
+        : formData.firstName.trim();
+
       const clientData: Partial<Client['fields']> = {
-        Name: formData.name,
+        Name: fullName,
+        'First Name': formData.firstName.trim(),
+        'Last Name': formData.lastName.trim() || undefined,
         Email: formData.email,
         Phone: formData.phone,
         Address: formData.address,
+        City: formData.city,
+        State: formData.state,
         'Zip Code': formData.zipCode,
         Status: formData.status as Client['fields']['Status'],
         Notes: formData.notes,
@@ -67,6 +158,40 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
         clientData['Preferred Payment Method'] = formData.preferredPaymentMethod as Client['fields']['Preferred Payment Method'];
       }
 
+      // Pricing fields
+      clientData['Pricing Type'] = formData.pricingType as Client['fields']['Pricing Type'];
+      if (formData.pricingType === 'Hourly Rate') {
+        clientData['Client Hourly Rate'] = formData.clientHourlyRate;
+      } else {
+        clientData['Charge Per Cleaning'] = formData.chargePerCleaning;
+      }
+
+      // Property details
+      clientData['Bedrooms'] = formData.bedrooms;
+      clientData['Bathrooms'] = formData.bathrooms;
+
+      // Recurring fields
+      clientData['Is Recurring'] = formData.isRecurring;
+      if (formData.isRecurring) {
+        if (formData.recurrenceFrequency) {
+          clientData['Recurrence Frequency'] = formData.recurrenceFrequency as Client['fields']['Recurrence Frequency'];
+        }
+        if (formData.recurringDays.length > 0) {
+          clientData['Recurring Days'] = formData.recurringDays.join(', ');
+          // Also set the first day as the primary recurring day for backwards compatibility
+          clientData['Recurring Day'] = formData.recurringDays[0] as Client['fields']['Recurring Day'];
+        }
+        if (formData.recurringStartTime) {
+          clientData['Recurring Start Time'] = formData.recurringStartTime;
+        }
+        if (formData.recurringEndTime) {
+          clientData['Recurring End Time'] = formData.recurringEndTime;
+        }
+        if (formData.firstCleaningDate) {
+          clientData['First Cleaning Date'] = formData.firstCleaningDate;
+        }
+      }
+
       await onSave(clientData);
     } catch (error) {
       console.error('Failed to save client:', error);
@@ -76,8 +201,19 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
     }
   };
 
-  const handleChange = (field: string, value: string) => {
+  const handleChange = (field: string, value: string | boolean | string[] | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const toggleDay = (day: string) => {
+    const currentDays = formData.recurringDays;
+    if (currentDays.includes(day)) {
+      handleChange('recurringDays', currentDays.filter(d => d !== day));
+    } else {
+      // Keep days in order
+      const newDays = DAYS_OF_WEEK.filter(d => currentDays.includes(d) || d === day);
+      handleChange('recurringDays', [...newDays]);
+    }
   };
 
   return (
@@ -86,18 +222,33 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
       <div className="bg-white p-6 rounded-lg border border-gray-200 space-y-4">
         <h3 className="font-semibold text-lg">Contact Information</h3>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Full Name *
-          </label>
-          <input
-            type="text"
-            required
-            value={formData.name}
-            onChange={(e) => handleChange('name', e.target.value)}
-            placeholder="John Smith"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-          />
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              First Name *
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.firstName}
+              onChange={(e) => handleChange('firstName', e.target.value)}
+              placeholder="John"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Last Name
+            </label>
+            <input
+              type="text"
+              value={formData.lastName}
+              onChange={(e) => handleChange('lastName', e.target.value)}
+              placeholder="Smith (optional)"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -122,9 +273,10 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
               type="tel"
               required
               value={formData.phone}
-              onChange={(e) => handleChange('phone', e.target.value)}
+              onChange={(e) => handleChange('phone', formatPhoneNumber(e.target.value))}
               placeholder="(310) 555-1234"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              maxLength={14}
             />
           </div>
         </div>
@@ -148,18 +300,106 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Zip Code *
-          </label>
-          <input
-            type="text"
-            required
-            value={formData.zipCode}
-            onChange={(e) => handleChange('zipCode', e.target.value)}
-            placeholder="90266"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg max-w-xs"
-          />
+        <div className="grid grid-cols-3 gap-4">
+          <div className="relative">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              City *
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.city}
+              onChange={(e) => {
+                handleChange('city', e.target.value);
+                setShowCitySuggestions(true);
+              }}
+              onFocus={() => setShowCitySuggestions(true)}
+              onBlur={() => setTimeout(() => setShowCitySuggestions(false), 150)}
+              placeholder="Start typing city..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            />
+            {showCitySuggestions && formData.city && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                {CITY_SUGGESTIONS
+                  .filter(city => city.toLowerCase().includes(formData.city.toLowerCase()))
+                  .map(city => (
+                    <button
+                      key={city}
+                      type="button"
+                      className="w-full px-3 py-2 text-left hover:bg-gray-100 text-sm"
+                      onMouseDown={() => {
+                        handleChange('city', city);
+                        setShowCitySuggestions(false);
+                      }}
+                    >
+                      {city}
+                    </button>
+                  ))
+                }
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              State *
+            </label>
+            <select
+              required
+              value={formData.state}
+              onChange={(e) => handleChange('state', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            >
+              <option value="CA">California</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Zip Code *
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.zipCode}
+              onChange={(e) => handleChange('zipCode', e.target.value)}
+              placeholder="90266"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+        </div>
+
+        {/* Bedrooms & Bathrooms */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Bedrooms
+            </label>
+            <select
+              value={formData.bedrooms}
+              onChange={(e) => handleChange('bedrooms', parseInt(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            >
+              {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
+                <option key={num} value={num}>{num}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Bathrooms
+            </label>
+            <select
+              value={formData.bathrooms}
+              onChange={(e) => handleChange('bathrooms', parseFloat(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            >
+              {[1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6].map(num => (
+                <option key={num} value={num}>{num}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -256,6 +496,200 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
             <option value="Other">Other</option>
           </select>
         </div>
+      </div>
+
+      {/* Pricing */}
+      <div className="bg-white p-6 rounded-lg border border-gray-200 space-y-4">
+        <h3 className="font-semibold text-lg">Pricing</h3>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Pricing Type
+          </label>
+          <div className="flex gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="pricingType"
+                value="Per Cleaning"
+                checked={formData.pricingType === 'Per Cleaning'}
+                onChange={(e) => handleChange('pricingType', e.target.value)}
+                className="w-4 h-4 text-blue-600"
+              />
+              <span className="text-sm">Charge Per Cleaning</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="pricingType"
+                value="Hourly Rate"
+                checked={formData.pricingType === 'Hourly Rate'}
+                onChange={(e) => handleChange('pricingType', e.target.value)}
+                className="w-4 h-4 text-blue-600"
+              />
+              <span className="text-sm">Hourly Rate</span>
+            </label>
+          </div>
+        </div>
+
+        {formData.pricingType === 'Per Cleaning' ? (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Charge Per Cleaning
+            </label>
+            <div className="relative w-48">
+              <span className="absolute left-3 top-2 text-gray-500">$</span>
+              <input
+                type="number"
+                value={formData.chargePerCleaning}
+                onChange={(e) => handleChange('chargePerCleaning', e.target.value === '' ? 0 : parseFloat(e.target.value))}
+                className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg"
+                min="0"
+                step="5"
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Fixed amount charged per cleaning visit</p>
+          </div>
+        ) : (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Hourly Rate
+            </label>
+            <div className="relative w-48">
+              <span className="absolute left-3 top-2 text-gray-500">$</span>
+              <input
+                type="number"
+                value={formData.clientHourlyRate}
+                onChange={(e) => handleChange('clientHourlyRate', e.target.value === '' ? 0 : parseFloat(e.target.value))}
+                className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg"
+                min="0"
+                step="5"
+              />
+              <span className="absolute right-3 top-2 text-gray-500">/hr</span>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Rate charged per hour of cleaning</p>
+          </div>
+        )}
+      </div>
+
+      {/* Recurring Schedule */}
+      <div className="bg-white p-6 rounded-lg border border-gray-200 space-y-4">
+        <h3 className="font-semibold text-lg">Recurring Schedule</h3>
+
+        <div className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            id="isRecurring"
+            checked={formData.isRecurring}
+            onChange={(e) => handleChange('isRecurring', e.target.checked)}
+            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+          <label htmlFor="isRecurring" className="text-sm font-medium text-gray-700">
+            This client has a recurring cleaning schedule
+          </label>
+        </div>
+
+        {formData.isRecurring && (
+          <div className="space-y-4 pt-2">
+            {/* Frequency */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Frequency
+              </label>
+              <select
+                value={formData.recurrenceFrequency}
+                onChange={(e) => handleChange('recurrenceFrequency', e.target.value)}
+                className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg"
+              >
+                <option value="">Select frequency...</option>
+                <option value="Weekly">Weekly</option>
+                <option value="Bi-weekly">Bi-weekly (Every 2 weeks)</option>
+                <option value="Monthly">Monthly</option>
+              </select>
+            </div>
+
+            {/* Days of Week - Multi-select */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Days of Week
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {DAYS_OF_WEEK.map((day) => (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => toggleDay(day)}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      formData.recurringDays.includes(day)
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {day.slice(0, 3)}
+                  </button>
+                ))}
+              </div>
+              {formData.recurringDays.length > 0 && (
+                <p className="text-sm text-gray-500 mt-2">
+                  Selected: {formData.recurringDays.join(', ')}
+                </p>
+              )}
+            </div>
+
+            {/* Time Range */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Time Range
+              </label>
+              <div className="flex items-center gap-3">
+                <select
+                  value={formData.recurringStartTime}
+                  onChange={(e) => handleChange('recurringStartTime', e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg"
+                >
+                  {TIME_OPTIONS.map(time => (
+                    <option key={time} value={time}>{time}</option>
+                  ))}
+                </select>
+                <span className="text-gray-500">to</span>
+                <select
+                  value={formData.recurringEndTime}
+                  onChange={(e) => handleChange('recurringEndTime', e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg"
+                >
+                  {TIME_OPTIONS.map(time => (
+                    <option key={time} value={time}>{time}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* First Cleaning Date */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                First Cleaning Date
+              </label>
+              <input
+                type="date"
+                value={formData.firstCleaningDate}
+                onChange={(e) => handleChange('firstCleaningDate', e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg"
+              />
+              <p className="text-xs text-gray-500 mt-1">When does the recurring schedule start?</p>
+            </div>
+
+            {/* Schedule Summary */}
+            {formData.recurringDays.length > 0 && formData.recurrenceFrequency && (
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <span className="font-medium">Schedule: </span>
+                  {formData.recurrenceFrequency} on {formData.recurringDays.join(', ')}, {formData.recurringStartTime} - {formData.recurringEndTime}
+                  {formData.firstCleaningDate && ` (starting ${new Date(formData.firstCleaningDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})`}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Notes */}

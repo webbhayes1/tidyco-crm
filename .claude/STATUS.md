@@ -1,14 +1,16 @@
 # Custom Next.js Portal - Status
 
-**Last Updated**: 2026-01-09 18:17
-**Session**: 5 (Full-Power Code Review, Bug Fixes & UI Polish)
-**Progress**: Production Ready (~95% complete)
+**Last Updated**: 2026-01-13
+**Session**: 8 (Reschedule Feature, Name Split, Pricing Calculations)
+**Progress**: Deployed to Production (~92% complete)
+**Production URL**: https://tidyco-crm.vercel.app
+**GitHub Repo**: https://github.com/webbhayes1/tidyco-crm
 
 ---
 
-## Current State: PRODUCTION READY ✅
+## Current State: DEPLOYED TO VERCEL ✅
 
-The Custom CRM is now **95% functional** with all core features working, critical bugs fixed, and UI polished. System is stable and ready for business use.
+The Custom CRM is now **deployed to Vercel** at https://tidyco-crm.vercel.app. Clerk authentication was temporarily removed to resolve deployment issues. Session 7 fixed calendar time parsing, timezone bugs, and added auto-recurring job generation + cascade deletes.
 
 ### ✅ Phase 1: Foundation - COMPLETE
 - [x] Next.js 14 project initialized with TypeScript
@@ -222,6 +224,47 @@ custom/
 
 ## Session History
 
+### Session 8 (2026-01-13): Reschedule Feature, Name Split, Pricing Calculations ✅
+- **Reschedule feature completed** - Added RescheduleButton to job detail page
+  - Modal allows single job or all future jobs reschedule
+  - Calculates day offset and applies to all future jobs if selected
+- **First Name / Last Name split** - Added separate name fields to Clients table (Airtable)
+  - TypeScript types updated in `types/airtable.ts`
+  - ClientForm updated with separate first/last name inputs
+  - Backwards compatible - parses existing Name field for edit
+  - Last Name is optional per user request
+- **Duration and pricing calculation improvements**
+  - Added `parseTimeToHours()` and `calculateDurationHours()` functions
+  - Jobs now get Duration Hours calculated from start/end time
+  - Bidirectional pricing: Per Cleaning calculates hourly rate; Hourly Rate calculates total amount
+  - Both Client Hourly Rate and Amount Charged populated on job creation
+
+### Session 7 (2026-01-12): Calendar & Recurring Jobs Fixes ✅
+- **Fixed time parsing** on daily/weekly calendar - handles both 12-hour ("10:00 AM") and 24-hour ("14:00") formats
+- **Fixed monthly calendar** - was missing client data fetch, now enriches jobs with client/cleaner names
+- **Fixed timezone bug** - dates showing wrong day (Jan 20 instead of Jan 21) due to UTC midnight parsing
+  - Added `parseDate` helper that appends 'T12:00:00' to date strings
+  - Applied throughout client detail page
+- **Auto-recurring job generation** - When creating recurring clients, system now auto-generates jobs for 6 months ahead
+  - Generates based on frequency (Weekly, Bi-weekly, Monthly)
+  - Includes: client link, cleaner, time, address, service type, amount charged
+- **Cascade delete** - Deleting a client now deletes all associated jobs first
+  - Prevents orphaned jobs in database
+- **Cleaned up orphaned jobs** - Deleted 13 orphaned jobs from Airtable after testing cascade delete
+
+### Session 6 (2026-01-12): Vercel Deployment ✅
+- **Deployed to Vercel** at https://tidyco-crm.vercel.app
+- **Pushed to GitHub** at https://github.com/webbhayes1/tidyco-crm
+- **Temporarily removed Clerk** to fix deployment 500 errors:
+  - Deleted middleware.ts
+  - Removed @clerk/nextjs from package.json
+  - Commented out ClerkProvider in layout.tsx
+  - Commented out UserButton in Navigation.tsx
+  - Deleted sign-in/sign-up pages
+- Fixed JobForm field name mismatches (Date, Time, Duration Hours, etc.)
+- Fixed TypeScript type casting in lib/airtable.ts
+- **User plans to re-enable Clerk later today**
+
 ### Session 5 (2026-01-09): Code Review & Bug Fixes ✅
 - Fixed 4 critical bugs (DataTable, Dashboard, Calendar x2)
 - Complete calendar UI redesign
@@ -242,10 +285,31 @@ custom/
 ---
 
 ## Deployment Status
-- **Environment**: Development (localhost:3000)
+- **Production URL**: https://tidyco-crm.vercel.app ✅
+- **GitHub Repo**: https://github.com/webbhayes1/tidyco-crm ✅
+- **Local Dev**: localhost:3000
 - **Build Status**: Compiles successfully ✅
 - **Runtime Status**: All pages load without errors ✅
-- **Production Ready**: Yes (95% complete) ✅
+- **Authentication**: Temporarily disabled (Clerk removed for deployment)
+
+### Vercel Environment Variables
+```
+AIRTABLE_API_KEY=patBAltZnF2grQ7t0.4170a8a543fcdbb14f57c2e329c3a6a4e85841dec8ff8da9e51575e3865ec88a
+AIRTABLE_BASE_ID=appfisQaCpwJLlSyx
+```
+
+### To Re-enable Clerk Authentication
+1. `npm install @clerk/nextjs`
+2. Create middleware.ts with `clerkMiddleware()`
+3. Uncomment ClerkProvider in app/layout.tsx
+4. Uncomment UserButton in components/Navigation.tsx
+5. Recreate sign-in/sign-up pages
+6. Add Clerk env vars to Vercel:
+   - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+   - CLERK_SECRET_KEY
+   - NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+   - NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+7. Redeploy
 
 ---
 
@@ -286,6 +350,6 @@ custom/
 
 ---
 
-**Status**: 🟢 **PRODUCTION READY - 95% COMPLETE**
+**Status**: 🟢 **DEPLOYED TO PRODUCTION - 92% COMPLETE**
 
-The Custom CRM is stable, functional, and ready for actual business use. Remaining 5% consists of enhancements and additional features that don't block core operations.
+The Custom CRM is deployed to Vercel at https://tidyco-crm.vercel.app and ready for business use. Session 8 added reschedule functionality, First Name/Last Name fields for personalized auto-texts, and improved pricing/duration calculations for recurring jobs. Clerk authentication is temporarily disabled and will be re-enabled by user.

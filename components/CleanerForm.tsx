@@ -65,6 +65,15 @@ function parsePreferredHours(preferredHours: string | undefined, existingDays: D
   return defaultSchedule;
 }
 
+// Format phone number as (XXX) XXX-XXXX
+function formatPhoneNumber(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length === 0) return '';
+  if (digits.length <= 3) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+}
+
 // Convert schedule to preferred hours string
 function scheduleToString(schedule: WeekSchedule): string {
   const dayAbbrevs: Record<DayOfWeek, string> = {
@@ -87,6 +96,7 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
     email: cleaner?.fields.Email || '',
     phone: cleaner?.fields.Phone || '',
     zellePaymentInfo: cleaner?.fields['Zelle Payment Info'] || '',
+    language: cleaner?.fields.Language || 'English',
     status: cleaner?.fields.Status || 'Active',
     hourlyRate: cleaner?.fields['Hourly Rate'] || 25,
     experienceLevel: cleaner?.fields['Experience Level'] || 'Junior',
@@ -110,6 +120,7 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
         Name: formData.name,
         Phone: formData.phone,
         'Zelle Payment Info': formData.zellePaymentInfo,
+        Language: formData.language as 'English' | 'Spanish' | 'Both',
         Status: formData.status as 'Active' | 'Inactive' | 'On Leave',
         'Hourly Rate': formData.hourlyRate,
         'Experience Level': formData.experienceLevel as 'Junior' | 'Mid-Level' | 'Senior',
@@ -216,25 +227,44 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
               type="tel"
               required
               value={formData.phone}
-              onChange={(e) => handleChange('phone', e.target.value)}
+              onChange={(e) => handleChange('phone', formatPhoneNumber(e.target.value))}
               placeholder="(310) 555-1234"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              maxLength={14}
             />
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Zelle Payment Info *
-          </label>
-          <input
-            type="text"
-            required
-            value={formData.zellePaymentInfo}
-            onChange={(e) => handleChange('zellePaymentInfo', e.target.value)}
-            placeholder="Phone number or email for Zelle payments"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-          />
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Zelle Payment Info *
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.zellePaymentInfo}
+              onChange={(e) => handleChange('zellePaymentInfo', e.target.value)}
+              placeholder="Phone number or email for Zelle payments"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Language *
+            </label>
+            <select
+              required
+              value={formData.language}
+              onChange={(e) => handleChange('language', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            >
+              <option value="English">English</option>
+              <option value="Spanish">Spanish</option>
+              <option value="Both">Both</option>
+            </select>
+          </div>
         </div>
       </div>
 

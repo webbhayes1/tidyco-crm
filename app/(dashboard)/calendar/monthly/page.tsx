@@ -30,9 +30,24 @@ export default function CalendarMonthlyPage() {
     Promise.all([
       fetch('/api/jobs').then(r => r.json()),
       fetch('/api/cleaners').then(r => r.json()),
-    ]).then(([jobsData, cleanersData]) => {
-      setJobs(jobsData);
+      fetch('/api/clients').then(r => r.json()),
+    ]).then(([jobsData, cleanersData, clientsData]) => {
+      // Create lookup maps
+      const clientMap = new Map(clientsData.map((c: any) => [c.id, c.fields.Name]));
+      const cleanerMap = new Map(cleanersData.map((c: any) => [c.id, c.fields.Name]));
+
+      // Enrich jobs with client and cleaner names
+      const enrichedJobs = jobsData.map((job: Job) => ({
+        ...job,
+        clientName: job.fields.Client?.[0] ? clientMap.get(job.fields.Client[0]) || 'Unknown' : 'Unknown',
+        cleanerName: job.fields.Cleaner?.[0] ? cleanerMap.get(job.fields.Cleaner[0]) || 'Unassigned' : 'Unassigned',
+      }));
+
+      setJobs(enrichedJobs);
       setCleaners(cleanersData);
+      setLoading(false);
+    }).catch((error) => {
+      console.error('Failed to load calendar data:', error);
       setLoading(false);
     });
   }, []);

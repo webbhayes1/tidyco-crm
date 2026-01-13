@@ -2,19 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth, subMonths, isWithinInterval } from 'date-fns';
-import { DollarSign, TrendingUp, TrendingDown, PieChart, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import {
+  CheckCircle,
+  AlertCircle,
+  Calendar,
+  Gift
+} from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
-import type { Income, Expense, Job } from '@/types/airtable';
-
-interface FinancialSummary {
-  totalIncome: number;
-  totalExpenses: number;
-  netProfit: number;
-  profitMargin: number;
-}
+import type { Expense, Job } from '@/types/airtable';
 
 export default function FinancesPage() {
-  const [income, setIncome] = useState<Income[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,11 +19,9 @@ export default function FinancesPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/income').then(r => r.json()),
       fetch('/api/expenses').then(r => r.json()),
       fetch('/api/jobs').then(r => r.json()),
-    ]).then(([incomeData, expenseData, jobsData]) => {
-      setIncome(incomeData);
+    ]).then(([expenseData, jobsData]) => {
       setExpenses(expenseData);
       setJobs(jobsData);
       setLoading(false);
@@ -45,17 +40,10 @@ export default function FinancesPage() {
       const lastMonth = subMonths(now, 1);
       return { start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) };
     }
-    return null; // all-time
+    return null;
   };
 
   const dateRange = getDateRange();
-
-  const filteredIncome = dateRange
-    ? income.filter(i => {
-        const date = new Date(i.fields.Date);
-        return isWithinInterval(date, { start: dateRange.start, end: dateRange.end });
-      })
-    : income;
 
   const filteredExpenses = dateRange
     ? expenses.filter(e => {
@@ -72,21 +60,34 @@ export default function FinancesPage() {
       })
     : jobs;
 
-  // Calculate summary
-  const summary: FinancialSummary = {
-    totalIncome: filteredIncome.reduce((sum, i) => sum + (i.fields.Amount || 0), 0),
-    totalExpenses: filteredExpenses.reduce((sum, e) => sum + (e.fields.Amount || 0), 0),
-    netProfit: 0,
-    profitMargin: 0,
-  };
-  summary.netProfit = summary.totalIncome - summary.totalExpenses;
-  summary.profitMargin = summary.totalIncome > 0 ? (summary.netProfit / summary.totalIncome) * 100 : 0;
-
-  // Calculate job revenue from completed jobs
+  // Job categories
   const completedJobs = filteredJobs.filter(j => j.fields.Status === 'Completed');
-  const jobRevenue = completedJobs.reduce((sum, j) => sum + (j.fields['Amount Charged'] || 0), 0);
-  const cleanerPayouts = completedJobs.reduce((sum, j) => sum + (j.fields['Cleaner Payout'] || 0), 0);
-  const jobProfit = completedJobs.reduce((sum, j) => sum + (j.fields['Profit'] || 0), 0);
+  const paidJobs = completedJobs.filter(j => j.fields['Payment Status'] === 'Paid');
+  const unpaidJobs = completedJobs.filter(j => j.fields['Payment Status'] !== 'Paid');
+
+  // EXPECTED calculations (from all jobs this period)
+  const expectedRevenue = filteredJobs.reduce((sum, j) => sum + (j.fields['Amount Charged'] || 0), 0);
+  const expectedCleanerPayout = filteredJobs.reduce((sum, j) => {
+    const hours = j.fields['Duration Hours'] || 0;
+    const rate = j.fields['Cleaner Hourly Rate'] || 0;
+    return sum + (hours * rate);
+  }, 0);
+  const expectedProfit = expectedRevenue - expectedCleanerPayout;
+
+  // ACTUAL calculations (from paid jobs only)
+  const actualRevenue = paidJobs.reduce((sum, j) => sum + (j.fields['Amount Charged'] || 0), 0);
+  const actualCleanerPayout = paidJobs.reduce((sum, j) => sum + (j.fields['Cleaner Payout'] || 0), 0);
+  const actualProfit = paidJobs.reduce((sum, j) => sum + (j.fields['Profit'] || 0), 0);
+
+  // Outstanding (completed but unpaid)
+  const outstandingRevenue = unpaidJobs.reduce((sum, j) => sum + (j.fields['Amount Charged'] || 0), 0);
+
+  // Tips
+  const totalTips = filteredJobs.reduce((sum, j) => sum + (j.fields['Tip Amount'] || 0), 0);
+  const jobsWithTips = filteredJobs.filter(j => (j.fields['Tip Amount'] || 0) > 0);
+
+  // Expenses
+  const totalExpenses = filteredExpenses.reduce((sum, e) => sum + (e.fields.Amount || 0), 0);
 
   // Expense breakdown by category
   const expensesByCategory = filteredExpenses.reduce((acc, e) => {
@@ -95,280 +96,296 @@ export default function FinancesPage() {
     return acc;
   }, {} as Record<string, number>);
 
-  // Income breakdown by category
-  const incomeByCategory = filteredIncome.reduce((acc, i) => {
-    const category = i.fields.Category || 'Cleaning Service';
-    acc[category] = (acc[category] || 0) + (i.fields.Amount || 0);
-    return acc;
-  }, {} as Record<string, number>);
+  // Net profit (actual revenue - expenses)
+  const netProfit = actualRevenue - totalExpenses;
 
-  // Income breakdown by payment method
-  const incomeByMethod = filteredIncome.reduce((acc, i) => {
-    const method = i.fields['Payment Method'] || 'Unknown';
-    acc[method] = (acc[method] || 0) + (i.fields.Amount || 0);
-    return acc;
-  }, {} as Record<string, number>);
+  // Period label
+  const periodLabel = selectedPeriod === 'this-month'
+    ? format(new Date(), 'MMMM yyyy')
+    : selectedPeriod === 'last-month'
+    ? format(subMonths(new Date(), 1), 'MMMM yyyy')
+    : 'All Time';
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="text-gray-500">Loading financial data...</div>
+        <div className="animate-pulse text-gray-500">Loading financial data...</div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
-        title="Finances"
+        title={`Finances - ${periodLabel}`}
         actions={
-          <div className="flex items-center gap-2">
-            <select
-              value={selectedPeriod}
-              onChange={(e) => setSelectedPeriod(e.target.value as typeof selectedPeriod)}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm"
-            >
-              <option value="this-month">This Month</option>
-              <option value="last-month">Last Month</option>
-              <option value="all-time">All Time</option>
-            </select>
-          </div>
+          <select
+            value={selectedPeriod}
+            onChange={(e) => setSelectedPeriod(e.target.value as typeof selectedPeriod)}
+            className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-tidyco-blue focus:border-transparent"
+          >
+            <option value="this-month">This Month</option>
+            <option value="last-month">Last Month</option>
+            <option value="all-time">All Time</option>
+          </select>
         }
       />
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Total Income */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Total Income</p>
-              <p className="text-2xl font-bold text-green-600">${summary.totalIncome.toLocaleString()}</p>
+      {/* Expected vs Actual */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Expected Section */}
+        <section className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Calendar className="w-5 h-5 text-tidyco-blue" />
+            <h2 className="text-lg font-semibold text-tidyco-navy">Expected</h2>
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full ml-auto">
+              {filteredJobs.length} jobs
+            </span>
+          </div>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center py-3 border-b border-gray-100">
+              <span className="text-gray-600">Revenue</span>
+              <span className="text-xl font-bold text-tidyco-navy">${expectedRevenue.toLocaleString()}</span>
             </div>
-            <div className="p-3 bg-green-100 rounded-lg">
-              <ArrowUpRight className="w-6 h-6 text-green-600" />
+            <div className="flex justify-between items-center py-3 border-b border-gray-100">
+              <span className="text-gray-600">Cleaner Payouts</span>
+              <span className="text-xl font-bold text-orange-600">-${expectedCleanerPayout.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-center py-3">
+              <span className="text-gray-600 font-medium">Expected Profit</span>
+              <span className={`text-xl font-bold ${expectedProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                ${expectedProfit.toLocaleString()}
+              </span>
             </div>
           </div>
-          <p className="text-xs text-gray-500 mt-2">{filteredIncome.length} transactions</p>
-        </div>
+        </section>
 
-        {/* Total Expenses */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Total Expenses</p>
-              <p className="text-2xl font-bold text-red-600">${summary.totalExpenses.toLocaleString()}</p>
+        {/* Actual Section */}
+        <section className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <CheckCircle className="w-5 h-5 text-green-600" />
+            <h2 className="text-lg font-semibold text-tidyco-navy">Actual (Collected)</h2>
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full ml-auto">
+              {paidJobs.length} paid
+            </span>
+          </div>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center py-3 border-b border-gray-100">
+              <span className="text-gray-600">Revenue</span>
+              <span className="text-xl font-bold text-green-600">${actualRevenue.toLocaleString()}</span>
             </div>
-            <div className="p-3 bg-red-100 rounded-lg">
-              <ArrowDownRight className="w-6 h-6 text-red-600" />
+            <div className="flex justify-between items-center py-3 border-b border-gray-100">
+              <span className="text-gray-600">Cleaner Payouts</span>
+              <span className="text-xl font-bold text-orange-600">-${actualCleanerPayout.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-center py-3">
+              <span className="text-gray-600 font-medium">Actual Profit</span>
+              <span className={`text-xl font-bold ${actualProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                ${actualProfit.toLocaleString()}
+              </span>
             </div>
           </div>
-          <p className="text-xs text-gray-500 mt-2">{filteredExpenses.length} transactions</p>
+        </section>
+      </div>
+
+      {/* Outstanding & Tips Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Outstanding */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-amber-50 rounded-lg">
+              <AlertCircle className="w-5 h-5 text-amber-600" />
+            </div>
+            <span className="text-sm font-medium text-gray-500">Outstanding</span>
+          </div>
+          <p className="text-3xl font-bold text-amber-600">${outstandingRevenue.toLocaleString()}</p>
+          <p className="text-sm text-gray-500 mt-1">{unpaidJobs.length} jobs awaiting payment</p>
         </div>
 
-        {/* Net Profit */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Net Profit</p>
-              <p className={`text-2xl font-bold ${summary.netProfit >= 0 ? 'text-tidyco-blue' : 'text-red-600'}`}>
-                ${summary.netProfit.toLocaleString()}
+        {/* Tips */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-purple-50 rounded-lg">
+              <Gift className="w-5 h-5 text-purple-600" />
+            </div>
+            <span className="text-sm font-medium text-gray-500">Tips Received</span>
+          </div>
+          <p className="text-3xl font-bold text-purple-600">${totalTips.toLocaleString()}</p>
+          <p className="text-sm text-gray-500 mt-1">{jobsWithTips.length} jobs with tips</p>
+        </div>
+      </div>
+
+      {/* Net Profit After Expenses */}
+      <section className="bg-gray-50 rounded-xl p-6">
+        <h2 className="text-lg font-semibold text-tidyco-navy mb-4">Net Profit (After Expenses)</h2>
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-gray-100">
+            <div className="p-5">
+              <p className="text-sm text-gray-500 mb-1">Actual Revenue</p>
+              <p className="text-2xl font-bold text-green-600">${actualRevenue.toLocaleString()}</p>
+            </div>
+            <div className="p-5">
+              <p className="text-sm text-gray-500 mb-1">Cleaner Payouts</p>
+              <p className="text-2xl font-bold text-orange-600">-${actualCleanerPayout.toLocaleString()}</p>
+            </div>
+            <div className="p-5">
+              <p className="text-sm text-gray-500 mb-1">Business Expenses</p>
+              <p className="text-2xl font-bold text-red-600">-${totalExpenses.toLocaleString()}</p>
+            </div>
+            <div className="p-5 bg-gray-50">
+              <p className="text-sm text-gray-500 mb-1">Net Profit</p>
+              <p className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                ${netProfit.toLocaleString()}
               </p>
             </div>
-            <div className={`p-3 rounded-lg ${summary.netProfit >= 0 ? 'bg-blue-100' : 'bg-red-100'}`}>
-              {summary.netProfit >= 0 ? (
-                <TrendingUp className="w-6 h-6 text-tidyco-blue" />
-              ) : (
-                <TrendingDown className="w-6 h-6 text-red-600" />
-              )}
-            </div>
-          </div>
-          <p className="text-xs text-gray-500 mt-2">{summary.profitMargin.toFixed(1)}% margin</p>
-        </div>
-
-        {/* Cleaner Payouts */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Cleaner Payouts</p>
-              <p className="text-2xl font-bold text-orange-600">${cleanerPayouts.toLocaleString()}</p>
-            </div>
-            <div className="p-3 bg-orange-100 rounded-lg">
-              <DollarSign className="w-6 h-6 text-orange-600" />
-            </div>
-          </div>
-          <p className="text-xs text-gray-500 mt-2">{completedJobs.length} jobs completed</p>
-        </div>
-      </div>
-
-      {/* Job Revenue Stats */}
-      <div className="bg-gradient-to-r from-tidyco-blue to-blue-700 p-6 rounded-xl text-white">
-        <h3 className="text-lg font-semibold mb-4">Job Revenue Summary</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div>
-            <p className="text-blue-200 text-sm">Job Revenue</p>
-            <p className="text-2xl font-bold">${jobRevenue.toLocaleString()}</p>
-          </div>
-          <div>
-            <p className="text-blue-200 text-sm">Cleaner Payouts</p>
-            <p className="text-2xl font-bold">${cleanerPayouts.toLocaleString()}</p>
-          </div>
-          <div>
-            <p className="text-blue-200 text-sm">Job Profit</p>
-            <p className="text-2xl font-bold">${jobProfit.toLocaleString()}</p>
-          </div>
-          <div>
-            <p className="text-blue-200 text-sm">Jobs Completed</p>
-            <p className="text-2xl font-bold">{completedJobs.length}</p>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Income Breakdown */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-          <h3 className="font-semibold text-tidyco-navy mb-4 flex items-center gap-2">
-            <PieChart className="w-5 h-5" />
-            Income by Category
-          </h3>
-          <div className="space-y-3">
-            {Object.entries(incomeByCategory).map(([category, amount]) => {
-              const percentage = (amount / summary.totalIncome) * 100;
-              return (
-                <div key={category}>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-700">{category}</span>
-                    <span className="font-medium">${amount.toLocaleString()} ({percentage.toFixed(1)}%)</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-green-500 h-2 rounded-full"
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-            {Object.keys(incomeByCategory).length === 0 && (
-              <p className="text-gray-500 text-sm">No income data for this period</p>
-            )}
-          </div>
-        </div>
-
-        {/* Expense Breakdown */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-          <h3 className="font-semibold text-tidyco-navy mb-4 flex items-center gap-2">
-            <PieChart className="w-5 h-5" />
-            Expenses by Category
-          </h3>
-          <div className="space-y-3">
+      {/* Expenses Breakdown */}
+      {Object.keys(expensesByCategory).length > 0 && (
+        <section className="bg-white rounded-xl border border-gray-200 p-6">
+          <h3 className="font-semibold text-tidyco-navy mb-4">Expenses by Category</h3>
+          <div className="space-y-4">
             {Object.entries(expensesByCategory)
               .sort(([, a], [, b]) => b - a)
               .map(([category, amount]) => {
-                const percentage = (amount / summary.totalExpenses) * 100;
-                const colors: Record<string, string> = {
-                  'Cleaning Supplies': 'bg-blue-500',
-                  'Gas-Mileage': 'bg-yellow-500',
-                  'Marketing': 'bg-purple-500',
-                  'Cleaner Payouts': 'bg-orange-500',
-                  'Tools-Equipment': 'bg-teal-500',
-                  'Other': 'bg-gray-500',
+                const percentage = totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0;
+                const colors: Record<string, { bg: string; bar: string }> = {
+                  'Cleaning Supplies': { bg: 'bg-blue-50', bar: 'bg-blue-500' },
+                  'Gas-Mileage': { bg: 'bg-yellow-50', bar: 'bg-yellow-500' },
+                  'Marketing': { bg: 'bg-purple-50', bar: 'bg-purple-500' },
+                  'Cleaner Payouts': { bg: 'bg-orange-50', bar: 'bg-orange-500' },
+                  'Tools-Equipment': { bg: 'bg-teal-50', bar: 'bg-teal-500' },
+                  'Other': { bg: 'bg-gray-50', bar: 'bg-gray-500' },
                 };
+                const color = colors[category] || colors['Other'];
                 return (
                   <div key={category}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-700">{category}</span>
-                      <span className="font-medium">${amount.toLocaleString()} ({percentage.toFixed(1)}%)</span>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-gray-700 font-medium">{category}</span>
+                      <span className="text-gray-900 font-semibold">
+                        ${amount.toLocaleString()} <span className="text-gray-500 font-normal">({percentage.toFixed(0)}%)</span>
+                      </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-gray-100 rounded-full h-2.5">
                       <div
-                        className={`${colors[category] || 'bg-gray-500'} h-2 rounded-full`}
+                        className={`${color.bar} h-2.5 rounded-full transition-all`}
                         style={{ width: `${percentage}%` }}
                       />
                     </div>
                   </div>
                 );
               })}
-            {Object.keys(expensesByCategory).length === 0 && (
-              <p className="text-gray-500 text-sm">No expense data for this period</p>
-            )}
           </div>
-        </div>
-      </div>
+        </section>
+      )}
 
-      {/* Payment Methods */}
-      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-        <h3 className="font-semibold text-tidyco-navy mb-4">Income by Payment Method</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {Object.entries(incomeByMethod).map(([method, amount]) => {
-            const methodColors: Record<string, string> = {
-              'Zelle': 'bg-purple-100 text-purple-700 border-purple-200',
-              'Square': 'bg-blue-100 text-blue-700 border-blue-200',
-              'Cash': 'bg-green-100 text-green-700 border-green-200',
-            };
-            return (
-              <div
-                key={method}
-                className={`p-4 rounded-lg border ${methodColors[method] || 'bg-gray-100 text-gray-700 border-gray-200'}`}
-              >
-                <p className="text-sm font-medium">{method}</p>
-                <p className="text-xl font-bold">${amount.toLocaleString()}</p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Recent Transactions */}
+      {/* Recent Jobs & Expenses */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Income */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-          <h3 className="font-semibold text-tidyco-navy mb-4">Recent Income</h3>
-          <div className="space-y-3 max-h-80 overflow-y-auto">
-            {filteredIncome
-              .sort((a, b) => new Date(b.fields.Date).getTime() - new Date(a.fields.Date).getTime())
-              .slice(0, 10)
-              .map((item) => (
-                <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="font-medium text-sm">{item.fields.Client || 'Unknown Client'}</p>
+        {/* Recent Jobs */}
+        <section className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-tidyco-navy">Recent Jobs</h3>
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+              {completedJobs.length} completed
+            </span>
+          </div>
+          <div className="space-y-3 max-h-72 overflow-y-auto">
+            {completedJobs
+              .sort((a, b) => new Date(b.fields.Date || '').getTime() - new Date(a.fields.Date || '').getTime())
+              .slice(0, 6)
+              .map((job) => (
+                <div key={job.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm text-gray-900 truncate">
+                      {job.fields['Service Type'] || 'Cleaning'}
+                    </p>
                     <p className="text-xs text-gray-500">
-                      {format(new Date(item.fields.Date), 'MMM d, yyyy')} • {item.fields['Payment Method']}
+                      {job.fields.Date ? format(new Date(job.fields.Date), 'MMM d') : 'No date'}
+                      {job.fields['Tip Amount'] ? ` • $${job.fields['Tip Amount']} tip` : ''}
                     </p>
                   </div>
-                  <span className="text-green-600 font-semibold">+${item.fields.Amount}</span>
+                  <div className="text-right">
+                    <p className="font-semibold text-gray-900">${job.fields['Amount Charged'] || 0}</p>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      job.fields['Payment Status'] === 'Paid'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {job.fields['Payment Status'] || 'Unpaid'}
+                    </span>
+                  </div>
                 </div>
               ))}
-            {filteredIncome.length === 0 && (
-              <p className="text-gray-500 text-sm text-center py-4">No income records for this period</p>
+            {completedJobs.length === 0 && (
+              <p className="text-gray-500 text-sm text-center py-6">No completed jobs this period</p>
             )}
           </div>
-        </div>
+        </section>
 
         {/* Recent Expenses */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-          <h3 className="font-semibold text-tidyco-navy mb-4">Recent Expenses</h3>
-          <div className="space-y-3 max-h-80 overflow-y-auto">
+        <section className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-tidyco-navy">Recent Expenses</h3>
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+              ${totalExpenses.toLocaleString()} total
+            </span>
+          </div>
+          <div className="space-y-3 max-h-72 overflow-y-auto">
             {filteredExpenses
               .sort((a, b) => new Date(b.fields.Date).getTime() - new Date(a.fields.Date).getTime())
-              .slice(0, 10)
-              .map((item) => (
-                <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="font-medium text-sm">{item.fields.Description}</p>
+              .slice(0, 6)
+              .map((expense) => (
+                <div key={expense.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm text-gray-900 truncate">
+                      {expense.fields.Description}
+                    </p>
                     <p className="text-xs text-gray-500">
-                      {format(new Date(item.fields.Date), 'MMM d, yyyy')} • {item.fields.Category}
+                      {format(new Date(expense.fields.Date), 'MMM d')} • {expense.fields.Category}
                     </p>
                   </div>
-                  <span className="text-red-600 font-semibold">-${item.fields.Amount}</span>
+                  <p className="font-semibold text-red-600">-${expense.fields.Amount}</p>
                 </div>
               ))}
             {filteredExpenses.length === 0 && (
-              <p className="text-gray-500 text-sm text-center py-4">No expense records for this period</p>
+              <p className="text-gray-500 text-sm text-center py-6">No expenses this period</p>
             )}
           </div>
-        </div>
+        </section>
       </div>
+
+      {/* Quick Stats */}
+      <section className="bg-gray-50 rounded-xl p-6">
+        <h3 className="font-semibold text-tidyco-navy mb-4">Quick Stats</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white rounded-lg p-4 border border-gray-200">
+            <p className="text-xs text-gray-500 uppercase tracking-wide">Avg Job Value</p>
+            <p className="text-xl font-bold text-gray-900 mt-1">
+              ${filteredJobs.length > 0 ? Math.round(expectedRevenue / filteredJobs.length) : 0}
+            </p>
+          </div>
+          <div className="bg-white rounded-lg p-4 border border-gray-200">
+            <p className="text-xs text-gray-500 uppercase tracking-wide">Collection Rate</p>
+            <p className="text-xl font-bold text-gray-900 mt-1">
+              {completedJobs.length > 0 ? Math.round((paidJobs.length / completedJobs.length) * 100) : 0}%
+            </p>
+          </div>
+          <div className="bg-white rounded-lg p-4 border border-gray-200">
+            <p className="text-xs text-gray-500 uppercase tracking-wide">Avg Tip</p>
+            <p className="text-xl font-bold text-gray-900 mt-1">
+              ${jobsWithTips.length > 0 ? Math.round(totalTips / jobsWithTips.length) : 0}
+            </p>
+          </div>
+          <div className="bg-white rounded-lg p-4 border border-gray-200">
+            <p className="text-xs text-gray-500 uppercase tracking-wide">Profit Margin</p>
+            <p className="text-xl font-bold text-gray-900 mt-1">
+              {actualRevenue > 0 ? Math.round((actualProfit / actualRevenue) * 100) : 0}%
+            </p>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

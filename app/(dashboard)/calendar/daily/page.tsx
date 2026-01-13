@@ -134,14 +134,36 @@ export default function CalendarDailyPage() {
   const goToNextDay = () => setSelectedDate(addDays(selectedDate, 1));
   const goToToday = () => setSelectedDate(new Date());
 
+  // Parse time string (handles both "10:00 AM" and "14:00" formats)
+  const parseTime = (timeStr: string): number => {
+    if (!timeStr) return 0;
+
+    // Check for AM/PM format
+    const isPM = timeStr.toLowerCase().includes('pm');
+    const isAM = timeStr.toLowerCase().includes('am');
+
+    // Remove AM/PM and trim
+    const cleanTime = timeStr.replace(/\s*(am|pm)\s*/i, '').trim();
+    const [hoursStr, minutesStr] = cleanTime.split(':');
+    let hours = parseInt(hoursStr, 10);
+    const minutes = parseInt(minutesStr || '0', 10);
+
+    // Convert 12-hour to 24-hour
+    if (isPM && hours !== 12) hours += 12;
+    if (isAM && hours === 12) hours = 0;
+
+    return hours + minutes / 60;
+  };
+
   // Get job position and width
   const getJobPosition = (job: EnrichedJob) => {
     const startTime = job.fields.Time;
+    const endTime = job.fields['End Time'];
     if (!startTime) return { left: 0, width: 0 };
 
-    const [hours, minutes] = startTime.split(':').map(Number);
-    const startHour = hours + minutes / 60;
-    const duration = job.fields['Duration Hours'] || 2;
+    const startHour = parseTime(startTime);
+    const endHour = endTime ? parseTime(endTime) : startHour + (job.fields['Duration Hours'] || 2);
+    const duration = endHour - startHour;
 
     // Calculate position (each hour column is ~7.7% of width)
     const left = ((startHour - 7) / 13) * 100; // 7am = 0%, 8pm = 100%

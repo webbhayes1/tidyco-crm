@@ -171,22 +171,45 @@ export async function deleteJob(id: string): Promise<void> {
   await base(TABLES.JOBS).destroy(id);
 }
 
-// Get jobs for this week
+// Get jobs for this week (Sunday to Saturday)
 export async function getJobsThisWeek(): Promise<Job[]> {
   try {
-    // Simplified - just get all jobs for now
-    return await getJobs();
+    const today = new Date();
+    // Get start of week (Sunday)
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    // Get end of week (Saturday)
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    const startDate = startOfWeek.toISOString().split('T')[0];
+    const endDate = endOfWeek.toISOString().split('T')[0];
+
+    const formula = `AND({Date} >= '${startDate}', {Date} <= '${endDate}')`;
+    return await getJobs({ filterByFormula: formula });
   } catch (error) {
     console.error('Error getting jobs this week:', error);
     return [];
   }
 }
 
-// Get upcoming jobs (next 7 days)
-export async function getUpcomingJobs(): Promise<Job[]> {
+// Get upcoming jobs (all future jobs, limited for dashboard display)
+export async function getUpcomingJobs(limit: number = 20): Promise<Job[]> {
   try {
-    // Simplified - just get all jobs for now
-    return await getJobs();
+    const today = new Date().toISOString().split('T')[0];
+    const formula = `{Date} >= '${today}'`;
+    const jobs = await getJobs({ filterByFormula: formula });
+    // Sort by date ascending and limit
+    return jobs
+      .sort((a, b) => {
+        const dateA = a.fields.Date || '';
+        const dateB = b.fields.Date || '';
+        return dateA.localeCompare(dateB);
+      })
+      .slice(0, limit);
   } catch (error) {
     console.error('Error getting upcoming jobs:', error);
     return [];
@@ -197,6 +220,24 @@ export async function getUpcomingJobs(): Promise<Job[]> {
 export async function getUnassignedJobs(): Promise<Job[]> {
   const formula = `{Cleaner} = BLANK()`;
   return getJobs({ filterByFormula: formula });
+}
+
+// Get jobs for this month
+export async function getJobsThisMonth(): Promise<Job[]> {
+  try {
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+    const startDate = firstDay.toISOString().split('T')[0];
+    const endDate = lastDay.toISOString().split('T')[0];
+
+    const formula = `AND({Date} >= '${startDate}', {Date} <= '${endDate}')`;
+    return await getJobs({ filterByFormula: formula });
+  } catch (error) {
+    console.error('Error getting jobs this month:', error);
+    return [];
+  }
 }
 
 // ===== PAYMENTS =====
@@ -296,13 +337,13 @@ export async function getCleanerTraining(cleanerId?: string): Promise<CleanerTra
 // ===== DASHBOARD METRICS =====
 export async function getDashboardMetrics() {
   const [
-    upcomingJobs,
-    incomeThisMonth,
+    thisWeekJobs,
+    thisMonthJobs,
     allClients,
     allCleaners,
   ] = await Promise.all([
-    getUpcomingJobs(),
-    getIncomeThisMonth(),
+    getJobsThisWeek(),
+    getJobsThisMonth(),
     getClients('Grid view'),
     getCleaners('Grid view'),
   ]);
@@ -311,15 +352,17 @@ export async function getDashboardMetrics() {
   const activeClients = allClients.filter(c => c.fields.Status === 'Active');
   const activeCleaners = allCleaners.filter(c => c.fields.Status === 'Active');
 
-  const totalRevenue = incomeThisMonth.reduce((sum, income) => sum + (income.fields.Amount || 0), 0);
+  // Expected monthly revenue from all jobs scheduled this month
+  const expectedMonthlyRevenue = thisMonthJobs.reduce((sum, job) => sum + (job.fields['Amount Charged'] || 0), 0);
   const avgQualityScore = activeCleaners.length > 0
     ? activeCleaners.reduce((sum, cleaner) => sum + (cleaner.fields['Average Quality Score'] || 0), 0) / activeCleaners.length
     : 0;
 
   return {
-    upcomingJobsCount: upcomingJobs.length,
-    upcomingJobsRevenue: upcomingJobs.reduce((sum, job) => sum + (job.fields['Amount Charged'] || 0), 0),
-    monthlyRevenue: totalRevenue,
+    thisWeekJobsCount: thisWeekJobs.length,
+    thisWeekRevenue: thisWeekJobs.reduce((sum, job) => sum + (job.fields['Amount Charged'] || 0), 0),
+    expectedMonthlyRevenue,
+    thisMonthJobsCount: thisMonthJobs.length,
     activeClientsCount: activeClients.length,
     activeCleanersCount: activeCleaners.length,
     avgQualityScore: Math.round(avgQualityScore),

@@ -5,9 +5,18 @@ import { PageHeader } from '@/components/PageHeader';
 import { DataTable, Column } from '@/components/DataTable';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Job } from '@/types/airtable';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
+
+// Helper to parse date strings correctly (avoids timezone issues)
+const parseDate = (dateStr: string) => {
+  if (!dateStr) return new Date();
+  if (dateStr.length === 10) {
+    return new Date(dateStr + 'T12:00:00');
+  }
+  return parseISO(dateStr);
+};
 
 // Extended Job type with enriched data
 type EnrichedJob = Job & {
@@ -47,7 +56,7 @@ export default function JobsPage() {
     {
       key: 'Date',
       label: 'Date',
-      render: (job) => job.fields.Date ? format(new Date(job.fields.Date), 'MMM d, yyyy') : '-',
+      render: (job) => job.fields.Date ? format(parseDate(job.fields.Date), 'MMM d, yyyy') : '-',
     },
     {
       key: 'Time',
