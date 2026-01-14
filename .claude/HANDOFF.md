@@ -1,73 +1,96 @@
 # Custom CRM Session Handoff
 
 **Date**: 2026-01-14
-**Session**: 15 (Finances Fixes + Mark Paid + Daily Recurrence)
+**Session**: 17 (Leads Enhancement: SMS Drips & Subtabs)
 **Implementation**: Custom (Next.js)
-**Focus Area**: Finances page fixes, payment workflow, recurring schedule options
+**Focus Area**: Leads section subtabs, SMS drip campaign infrastructure
 
 ---
 
 ## Session Summary
 
-Fixed multiple issues on the Finances overview page, added Mark Paid workflow with tip entry, and added Daily recurrence frequency option with day-of-week selection for clients and jobs.
+Enhanced the Leads section with subtabs (Pipeline, SMS Drips) and built complete SMS drip campaign infrastructure including Airtable tables, TypeScript interfaces, API routes, and full UI for template management and campaigns.
 
 ---
 
 ## What Was Accomplished
 
-### 1. Finances Page Fixes
+### 1. Architecture Decision Document
 
-**Time Period Options:**
-- Added "This Year" option
-- Added "Custom Range" option with date pickers
-- Fixed "All Time" filter (was working, just needed confirmation)
+**Created:** `.claude/decisions/009-sms-drip-architecture.md`
+- Documents SMS storage strategy (Twilio API for history, avoids Airtable limits)
+- Template storage in Airtable (editable from UI)
+- SMS sending via n8n webhooks (enables AI personalization)
+- Resale model with Twilio subaccounts per customer
 
-**Fixed NaN/0 Calculations:**
-- Added `safeNumber()` helper to handle Airtable lookup arrays (e.g., `[25]` instead of `25`)
-- Fixed Expected Payouts showing NaN
-- Fixed Actual Payouts showing $0 (now calculates from hours × rate as fallback)
-- Applied safe number handling to all financial calculations
+### 2. Airtable Tables Created
 
-### 2. Mark Paid Workflow
+**SMS Templates** (`tblmDWUAQ9o1uWl0g`)
+- Fields: Name, Body, Category, Active, Use Count, Last Used, Created By, Notes
+- Imported 14 templates from spec file
 
-**New Component:** `MarkPaidButton.tsx`
-- Shows on job detail page (full version)
-- Shows on jobs list page for completed jobs (compact version)
-- Tracks both Client Payment and Cleaner Payout separately
+**Drip Campaigns** (`tbldWJM3qsKhSqwrl`)
+- Fields: Name, Description, Trigger Type, Trigger Conditions, Status, Sequence, Lead Count, Conversion Rate, Notes
 
-**Mark Paid Modal Features:**
-- Tip Amount entry (tips known at payment time, not completion)
-- Tip split calculation for multi-cleaner jobs
-- Client Payment checkbox + Cleaner Payout checkbox
-- Payment method selector (Zelle, Cash, Square, Credit Card, Check)
-- Button states: "Mark Paid" → "Pay Cleaner" → "Paid"
+**Campaign Enrollments** (`tbl11Yt1cb49iAvuF`)
+- Fields: Enrollment Name, Lead (linked), Campaign (linked), Status, Current Step, Enrolled/Last/Next/Completed Dates, Cancel Reason
 
-**API Route:** `POST /api/jobs/[id]/mark-paid`
-- Updates Payment Status = 'Paid' and Client Paid Date
-- Updates Cleaner Paid = true and Cleaner Paid Date
-- Saves Tip Amount
-- Saves Payment Method Used
+### 3. TypeScript Interfaces
 
-**Jobs List Integration:**
-- New "Payment" column for completed jobs
-- Compact "Mark Paid" button inline
-- Auto-refreshes list after marking paid
-- Prevents row click when clicking button
+**Added to `types/airtable.ts`:**
+- `SMSTemplate` - Template with body, category, variables
+- `DripCampaign` - Campaign with trigger type, sequence JSON
+- `CampaignEnrollment` - Lead enrollment with step tracking
+- `TwilioMessage` - Message history from Twilio API
 
-### 3. Daily Recurrence Option
+### 4. Airtable CRUD Functions
 
-**Updated Types:**
-- Added `'Daily'` to `Recurrence Frequency` for Client and Job types
-- Added `'Recurring Day'` and `'Recurring Days'` fields to Job type
+**Added to `lib/airtable.ts`:**
+- SMS Templates: CRUD + getActiveSMSTemplates, getSMSTemplatesByCategory
+- Drip Campaigns: CRUD + getActiveDripCampaigns
+- Campaign Enrollments: CRUD + getActiveEnrollments, getEnrollmentsForLead, getScheduledEnrollments
 
-**Client Form:**
-- Added "Daily (Select days below)" to frequency dropdown
-- Multi-day selection already existed - now works with Daily
+### 5. Leads Subtab Layout
 
-**Job Form:**
-- Added "Daily (Select days below)" to frequency dropdown
-- Added day-of-week button selector (Mon-Sun)
-- Shows schedule summary when frequency + day selected
+**Created:** `app/(dashboard)/leads/layout.tsx`
+- Two tabs: Pipeline (Kanban icon), SMS Drips (MessageSquare icon)
+- Follows finances layout pattern
+- Hides tabs on detail pages ([id], new, edit)
+
+**Modified:** `app/(dashboard)/leads/page.tsx`
+- Now redirects to `/leads/pipeline`
+
+**Created:** `app/(dashboard)/leads/pipeline/page.tsx`
+- Contains original leads page content
+
+### 6. SMS Drips Pages
+
+**Main Dashboard:** `/leads/sms-drips/page.tsx`
+- Stats cards: Active Templates, Active Campaigns, Active Enrollments
+- Quick Send card with lead/template selection (sends via n8n)
+- Upcoming Messages card showing scheduled drips
+- Recent Templates grid
+
+**Templates Page:** `/leads/sms-drips/templates/page.tsx`
+- Category filter (All, Lead Nurture, Booking, Payment, Re-engagement, Custom)
+- Template cards with edit/duplicate/delete actions
+- Create/Edit modal with variable insertion buttons
+- Live preview with sample data
+
+**Campaigns Page:** `/leads/sms-drips/campaigns/page.tsx`
+- Campaign list with status badges
+- Trigger type, lead count, conversion rate display
+- Pause/Activate/Delete actions
+
+### 7. API Routes Created
+
+| Route | Methods | Purpose |
+|-------|---------|---------|
+| `/api/sms/templates` | GET, POST | List and create templates |
+| `/api/sms/templates/[id]` | GET, PUT, DELETE | Single template CRUD |
+| `/api/sms/campaigns` | GET, POST | List and create campaigns |
+| `/api/sms/campaigns/[id]` | GET, PUT, DELETE | Single campaign CRUD |
+| `/api/sms/enrollments` | GET, POST | List and create enrollments |
 
 ---
 
@@ -75,66 +98,86 @@ Fixed multiple issues on the Finances overview page, added Mark Paid workflow wi
 
 | File | Description |
 |------|-------------|
-| `components/MarkPaidButton.tsx` | Payment status modal with tip entry |
-| `app/api/jobs/[id]/mark-paid/route.ts` | API to update payment status |
+| `.claude/decisions/009-sms-drip-architecture.md` | Architecture decision document |
+| `app/(dashboard)/leads/layout.tsx` | Subtab navigation layout |
+| `app/(dashboard)/leads/pipeline/page.tsx` | Pipeline view (moved from leads/page) |
+| `app/(dashboard)/leads/sms-drips/page.tsx` | SMS Drips main dashboard |
+| `app/(dashboard)/leads/sms-drips/templates/page.tsx` | Template management UI |
+| `app/(dashboard)/leads/sms-drips/campaigns/page.tsx` | Campaign management UI |
+| `app/api/sms/templates/route.ts` | Templates API |
+| `app/api/sms/templates/[id]/route.ts` | Single template API |
+| `app/api/sms/campaigns/route.ts` | Campaigns API |
+| `app/api/sms/campaigns/[id]/route.ts` | Single campaign API |
+| `app/api/sms/enrollments/route.ts` | Enrollments API |
 
 ## Files Modified
 
 | File | Changes |
 |------|---------|
-| `app/(dashboard)/finances/overview/page.tsx` | Added time periods, custom range, safeNumber() |
-| `app/(dashboard)/jobs/page.tsx` | Added Payment column with MarkPaidButton |
-| `app/(dashboard)/jobs/[id]/page.tsx` | Added MarkPaidButton to actions |
-| `components/ClientForm.tsx` | Added Daily frequency option |
-| `components/JobForm.tsx` | Added Daily frequency + day selection |
-| `types/airtable.ts` | Added Daily to frequencies, Recurring Day/Days to Job |
-
----
-
-## Payment Workflow (Completed vs Paid)
-
-**Two separate fields by design:**
-
-| Field | Tracks | Values |
-|-------|--------|--------|
-| Status | Job lifecycle | Pending → Scheduled → In Progress → Completed → Cancelled |
-| Payment Status | Payment collection | Pending → Paid → Refunded |
-
-**Workflow:**
-1. Job completed → Status = "Completed"
-2. Client pays → Click "Mark Paid" → Enter tip → Check "Client Payment"
-3. Pay cleaner → Click "Pay Cleaner" → Check "Cleaner Payout"
-
----
-
-## CRM Status: 98% Complete
-
-### Remaining CRM Work
-- [ ] Create invoice from job (quick action on job detail page)
-- [ ] Wire PDF download to n8n webhook
-- [ ] Wire email send to n8n webhook
-
-### Ready for n8n Phase
-- All core CRM pages complete
-- Payment workflow complete
-- Invoice system ready for automation integration
+| `.claude/decisions/INDEX.md` | Added 009 reference |
+| `.claude/decisions/airtable-changelog.md` | Logged 3 new tables |
+| `types/airtable.ts` | Added 4 new interfaces |
+| `lib/airtable.ts` | Added CRUD functions for 3 tables |
+| `app/(dashboard)/leads/page.tsx` | Changed to redirect |
 
 ---
 
 ## Build Status
 
-Dev server running at http://localhost:3000
+✅ Build completed successfully (45 pages generated)
+
+```
+├ ○ /leads                               156 B          87.3 kB
+├ ○ /leads/pipeline                      6.44 kB         107 kB
+├ ○ /leads/sms-drips                     3.28 kB         104 kB
+├ ○ /leads/sms-drips/campaigns           3.45 kB        97.4 kB
+├ ○ /leads/sms-drips/templates           4.5 kB         98.4 kB
+```
 
 ---
 
-## Important Notes
+## Still Needed (Not Implemented)
 
-1. **Tips entered at payment time** - Not at completion (tip amount unknown until client pays)
-2. **Completed ≠ Paid** - These are separate states for proper accounting
-3. **Daily recurrence** - Select specific days of week for multi-day schedules
-4. **safeNumber()** - Handles Airtable lookup arrays that return `[value]` instead of `value`
+### Twilio Integration
+- [ ] Add Twilio credentials to `.env.local`
+- [ ] Create `lib/twilio.ts` for message history
+- [ ] Create `/api/sms/history/[leadId]/route.ts`
+- [ ] Build `MessageHistory.tsx` component
+
+### n8n Webhook Integration
+- [ ] Create `lib/n8n-webhooks.ts`
+- [ ] Connect Quick Send to n8n workflow
+- [ ] Build n8n drip processor workflow
+
+### Lead Detail SMS Section
+- [ ] Add SMS tab/section to lead detail page
+- [ ] Show message history for specific lead
+- [ ] Allow sending from lead detail
+
+---
+
+## Environment Variables Required
+
+```bash
+# Add to .env.local when ready for Twilio
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_PHONE_NUMBER=+13105551234
+
+# n8n webhook URL
+N8N_WEBHOOK_URL=http://localhost:5678
+```
+
+---
+
+## Next Session Recommendations
+
+1. **Twilio Setup** - Add credentials and build message history fetching
+2. **n8n Workflows** - Build SMS send and drip processor workflows
+3. **Lead Detail SMS** - Add SMS section to individual lead pages
+4. **Test End-to-End** - Send test messages through full flow
 
 ---
 
 **Session End**: 2026-01-14
-**Status**: Payment workflow complete, daily recurrence added
+**Status**: SMS infrastructure complete, awaiting Twilio credentials

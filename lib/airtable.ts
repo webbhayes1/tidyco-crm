@@ -13,6 +13,9 @@ import {
   Team,
   Lead,
   Invoice,
+  SMSTemplate,
+  DripCampaign,
+  CampaignEnrollment,
 } from '@/types/airtable';
 
 // Initialize Airtable
@@ -37,6 +40,9 @@ const TABLES = {
   TEAMS: 'Teams',
   LEADS: 'Leads',
   INVOICES: 'Invoices',
+  SMS_TEMPLATES: 'SMS Templates',
+  DRIP_CAMPAIGNS: 'Drip Campaigns',
+  CAMPAIGN_ENROLLMENTS: 'Campaign Enrollments',
 } as const;
 
 // Helper function to convert Airtable record to our type
@@ -539,6 +545,181 @@ export async function getNextInvoiceNumber(): Promise<string> {
     return num > max ? num : max;
   }, 0);
   return `INV-${String(maxNum + 1).padStart(4, '0')}`;
+}
+
+// ===== SMS TEMPLATES =====
+export async function getSMSTemplates(options?: {
+  view?: string;
+  filterByFormula?: string;
+  maxRecords?: number;
+}): Promise<SMSTemplate[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const selectOptions: any = {
+    view: options?.view || 'Grid view',
+  };
+
+  if (options?.filterByFormula) {
+    selectOptions.filterByFormula = options.filterByFormula;
+  }
+  if (options?.maxRecords !== undefined) {
+    selectOptions.maxRecords = options.maxRecords;
+  }
+
+  const records = await base(TABLES.SMS_TEMPLATES).select(selectOptions).all();
+  return records.map(convertRecord<SMSTemplate>);
+}
+
+export async function getSMSTemplate(id: string): Promise<SMSTemplate | null> {
+  try {
+    const record = await base(TABLES.SMS_TEMPLATES).find(id);
+    return convertRecord<SMSTemplate>(record);
+  } catch (error) {
+    console.error('Error fetching SMS template:', error);
+    return null;
+  }
+}
+
+export async function createSMSTemplate(fields: SMSTemplate['fields']): Promise<SMSTemplate> {
+  const record = await base(TABLES.SMS_TEMPLATES).create(fields as unknown as FieldSet);
+  return convertRecord<SMSTemplate>(record);
+}
+
+export async function updateSMSTemplate(id: string, fields: Partial<SMSTemplate['fields']>): Promise<SMSTemplate> {
+  const record = await base(TABLES.SMS_TEMPLATES).update(id, fields as unknown as FieldSet);
+  return convertRecord<SMSTemplate>(record);
+}
+
+export async function deleteSMSTemplate(id: string): Promise<void> {
+  await base(TABLES.SMS_TEMPLATES).destroy(id);
+}
+
+// Get active templates only
+export async function getActiveSMSTemplates(): Promise<SMSTemplate[]> {
+  const formula = `{Active} = TRUE()`;
+  return getSMSTemplates({ filterByFormula: formula });
+}
+
+// Get templates by category
+export async function getSMSTemplatesByCategory(category: SMSTemplate['fields']['Category']): Promise<SMSTemplate[]> {
+  const formula = `{Category} = '${category}'`;
+  return getSMSTemplates({ filterByFormula: formula });
+}
+
+// ===== DRIP CAMPAIGNS =====
+export async function getDripCampaigns(options?: {
+  view?: string;
+  filterByFormula?: string;
+  maxRecords?: number;
+}): Promise<DripCampaign[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const selectOptions: any = {
+    view: options?.view || 'Grid view',
+  };
+
+  if (options?.filterByFormula) {
+    selectOptions.filterByFormula = options.filterByFormula;
+  }
+  if (options?.maxRecords !== undefined) {
+    selectOptions.maxRecords = options.maxRecords;
+  }
+
+  const records = await base(TABLES.DRIP_CAMPAIGNS).select(selectOptions).all();
+  return records.map(convertRecord<DripCampaign>);
+}
+
+export async function getDripCampaign(id: string): Promise<DripCampaign | null> {
+  try {
+    const record = await base(TABLES.DRIP_CAMPAIGNS).find(id);
+    return convertRecord<DripCampaign>(record);
+  } catch (error) {
+    console.error('Error fetching drip campaign:', error);
+    return null;
+  }
+}
+
+export async function createDripCampaign(fields: DripCampaign['fields']): Promise<DripCampaign> {
+  const record = await base(TABLES.DRIP_CAMPAIGNS).create(fields as unknown as FieldSet);
+  return convertRecord<DripCampaign>(record);
+}
+
+export async function updateDripCampaign(id: string, fields: Partial<DripCampaign['fields']>): Promise<DripCampaign> {
+  const record = await base(TABLES.DRIP_CAMPAIGNS).update(id, fields as unknown as FieldSet);
+  return convertRecord<DripCampaign>(record);
+}
+
+export async function deleteDripCampaign(id: string): Promise<void> {
+  await base(TABLES.DRIP_CAMPAIGNS).destroy(id);
+}
+
+// Get active campaigns only
+export async function getActiveDripCampaigns(): Promise<DripCampaign[]> {
+  const formula = `{Status} = 'Active'`;
+  return getDripCampaigns({ filterByFormula: formula });
+}
+
+// ===== CAMPAIGN ENROLLMENTS =====
+export async function getCampaignEnrollments(options?: {
+  view?: string;
+  filterByFormula?: string;
+  maxRecords?: number;
+}): Promise<CampaignEnrollment[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const selectOptions: any = {
+    view: options?.view || 'Grid view',
+  };
+
+  if (options?.filterByFormula) {
+    selectOptions.filterByFormula = options.filterByFormula;
+  }
+  if (options?.maxRecords !== undefined) {
+    selectOptions.maxRecords = options.maxRecords;
+  }
+
+  const records = await base(TABLES.CAMPAIGN_ENROLLMENTS).select(selectOptions).all();
+  return records.map(convertRecord<CampaignEnrollment>);
+}
+
+export async function getCampaignEnrollment(id: string): Promise<CampaignEnrollment | null> {
+  try {
+    const record = await base(TABLES.CAMPAIGN_ENROLLMENTS).find(id);
+    return convertRecord<CampaignEnrollment>(record);
+  } catch (error) {
+    console.error('Error fetching campaign enrollment:', error);
+    return null;
+  }
+}
+
+export async function createCampaignEnrollment(fields: CampaignEnrollment['fields']): Promise<CampaignEnrollment> {
+  const record = await base(TABLES.CAMPAIGN_ENROLLMENTS).create(fields as unknown as FieldSet);
+  return convertRecord<CampaignEnrollment>(record);
+}
+
+export async function updateCampaignEnrollment(id: string, fields: Partial<CampaignEnrollment['fields']>): Promise<CampaignEnrollment> {
+  const record = await base(TABLES.CAMPAIGN_ENROLLMENTS).update(id, fields as unknown as FieldSet);
+  return convertRecord<CampaignEnrollment>(record);
+}
+
+export async function deleteCampaignEnrollment(id: string): Promise<void> {
+  await base(TABLES.CAMPAIGN_ENROLLMENTS).destroy(id);
+}
+
+// Get active enrollments only
+export async function getActiveEnrollments(): Promise<CampaignEnrollment[]> {
+  const formula = `{Status} = 'Active'`;
+  return getCampaignEnrollments({ filterByFormula: formula });
+}
+
+// Get enrollments for a specific lead
+export async function getEnrollmentsForLead(leadId: string): Promise<CampaignEnrollment[]> {
+  const formula = `FIND("${leadId}", ARRAYJOIN({Lead}))`;
+  return getCampaignEnrollments({ filterByFormula: formula });
+}
+
+// Get enrollments with upcoming messages (for scheduled messages display)
+export async function getScheduledEnrollments(): Promise<CampaignEnrollment[]> {
+  const today = new Date().toISOString().split('T')[0];
+  const formula = `AND({Status} = 'Active', {Next Message Date} >= '${today}')`;
+  return getCampaignEnrollments({ filterByFormula: formula });
 }
 
 // ===== DASHBOARD METRICS =====

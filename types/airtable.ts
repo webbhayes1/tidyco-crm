@@ -364,6 +364,64 @@ export interface Invoice {
   };
 }
 
+export interface SMSTemplate {
+  id: string;
+  fields: {
+    'Name': string;
+    'Body': string;
+    'Category'?: 'Lead Nurture' | 'Booking' | 'Payment' | 'Re-engagement' | 'Custom';
+    'Active'?: boolean;
+    'Use Count'?: number;
+    'Last Used'?: string;
+    'Created By'?: 'Sean' | 'Webb' | 'System';
+    'Notes'?: string;
+  };
+}
+
+export interface DripCampaign {
+  id: string;
+  fields: {
+    'Name': string;
+    'Description'?: string;
+    'Trigger Type'?: 'Manual' | 'New Lead' | 'Status Change' | 'No Response' | 'Scheduled';
+    'Trigger Conditions'?: string; // JSON configuration
+    'Status'?: 'Active' | 'Paused' | 'Draft' | 'Archived';
+    'Sequence'?: string; // JSON array of steps with templateId and delay
+    'Lead Count'?: number;
+    'Conversion Rate'?: number;
+    'Notes'?: string;
+    'Campaign Enrollments'?: string[]; // Campaign Enrollment record IDs
+  };
+}
+
+export interface CampaignEnrollment {
+  id: string;
+  fields: {
+    'Enrollment Name'?: string;
+    'Lead'?: string[]; // Lead record ID
+    'Campaign'?: string[]; // Drip Campaign record ID
+    'Status'?: 'Active' | 'Completed' | 'Cancelled' | 'Paused';
+    'Current Step'?: number;
+    'Enrolled Date'?: string;
+    'Last Message Date'?: string;
+    'Next Message Date'?: string;
+    'Completed Date'?: string;
+    'Cancel Reason'?: 'Converted' | 'Unsubscribed' | 'Manual' | 'Lead Lost';
+  };
+}
+
+// Twilio message type (for message history from Twilio API)
+export interface TwilioMessage {
+  sid: string;
+  from: string;
+  to: string;
+  body: string;
+  direction: 'inbound' | 'outbound-api' | 'outbound-reply';
+  status: 'queued' | 'sent' | 'delivered' | 'failed' | 'received';
+  dateSent: string;
+  dateCreated: string;
+}
+
 // Helper types for API responses
 export interface AirtableRecord<T> {
   id: string;
