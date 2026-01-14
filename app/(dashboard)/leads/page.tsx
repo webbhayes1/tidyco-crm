@@ -264,6 +264,26 @@ function ImportLeadsModal({
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<Lead['fields'][]>([]);
+  const [fileName, setFileName] = useState<string | null>(null);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setFileName(file.name);
+    setError(null);
+    setPreview([]);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      setCsvData(text);
+    };
+    reader.onerror = () => {
+      setError('Failed to read file. Please try again.');
+    };
+    reader.readAsText(file);
+  };
 
   const parseCSV = (csv: string): Lead['fields'][] => {
     const lines = csv.trim().split('\n');
@@ -400,16 +420,49 @@ function ImportLeadsModal({
 
           <div className="mb-4">
             <p className="text-sm text-gray-600 mb-2">
-              Paste your CSV data below. Required column: <strong>Name</strong>
+              Upload a CSV file or paste data below. Required column: <strong>Name</strong>
             </p>
-            <p className="text-sm text-gray-500 mb-2">
+            <p className="text-sm text-gray-500 mb-3">
               Supported columns: Name, Email, Phone, Address, City, State, Zip Code, Source, Service Type, Bedrooms, Bathrooms, Notes, Angi Lead ID
             </p>
+
+            {/* File Upload */}
+            <div className="mb-3">
+              <label className="flex items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                <div className="text-center">
+                  <Upload className="mx-auto h-8 w-8 text-gray-400 mb-1" />
+                  {fileName ? (
+                    <span className="text-sm text-primary-600 font-medium">{fileName}</span>
+                  ) : (
+                    <span className="text-sm text-gray-500">Click to upload CSV file</span>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            <div className="relative mb-3">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">or paste CSV data</span>
+              </div>
+            </div>
+
             <textarea
               value={csvData}
-              onChange={(e) => setCsvData(e.target.value)}
+              onChange={(e) => {
+                setCsvData(e.target.value);
+                setFileName(null);
+              }}
               placeholder="Name,Phone,Email,Source&#10;John Smith,555-123-4567,john@email.com,Angi&#10;Jane Doe,555-987-6543,jane@email.com,Referral"
-              className="w-full h-40 border border-gray-300 rounded-md p-3 font-mono text-sm"
+              className="w-full h-32 border border-gray-300 rounded-md p-3 font-mono text-sm"
             />
           </div>
 
