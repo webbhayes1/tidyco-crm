@@ -1,8 +1,8 @@
 # Custom Next.js Portal - Status
 
-**Last Updated**: 2026-01-13
-**Session**: 11 (Teams Feature - Multi-Cleaner Support)
-**Progress**: Deployed to Production (~95% complete)
+**Last Updated**: 2026-01-14
+**Session**: 15 (Finances Fixes + Mark Paid + Daily Recurrence)
+**Progress**: Deployed to Production (~98% complete)
 **Production URL**: https://tidyco-crm.vercel.app
 **GitHub Repo**: https://github.com/webbhayes1/tidyco-crm
 
@@ -228,6 +228,27 @@ custom/
 ---
 
 ## Session History
+
+### Session 15 (2026-01-14): Finances Fixes + Mark Paid + Daily Recurrence ✅
+- **Finances page fixes**
+  - Added "This Year" and "Custom Range" time period options
+  - Fixed "All Time" filter
+  - Created `safeNumber()` helper for Airtable lookup arrays returning `[value]` instead of `value`
+  - Fixed Expected Payouts showing NaN
+  - Fixed Actual Payouts showing $0
+- **Mark Paid workflow** - New payment tracking system
+  - Created `MarkPaidButton.tsx` component with modal
+  - Created `/api/jobs/[id]/mark-paid` API endpoint
+  - Tracks Client Payment and Cleaner Payout separately
+  - Tip Amount entry at payment time (tips known when client pays, not at completion)
+  - Payment method selector (Zelle, Cash, Square, Credit Card, Check)
+  - Added Payment column to jobs list for completed jobs
+  - Button states: "Mark Paid" → "Pay Cleaner" → "Paid"
+- **Daily recurrence option** - New scheduling frequency
+  - Added 'Daily' to Recurrence Frequency types
+  - Day-of-week button selector for multi-day schedules
+  - Updated ClientForm and JobForm with Daily option
+  - Schedule summary display
 
 ### Session 11 (2026-01-13): Teams Feature - Multi-Cleaner Support ✅
 - **Teams table created in Airtable** (tblBO0GPVEy3tOl7a)

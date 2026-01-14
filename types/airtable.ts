@@ -29,7 +29,7 @@ export interface Client {
     'Entry Instructions'?: string;
     'Last Booking Date'?: string; // Rollup
     'Is Recurring'?: boolean;
-    'Recurrence Frequency'?: 'Weekly' | 'Bi-weekly' | 'Monthly';
+    'Recurrence Frequency'?: 'Daily' | 'Weekly' | 'Bi-weekly' | 'Monthly';
     'Recurring Day'?: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
     'Recurring Days'?: string; // Comma-separated days like "Monday, Tuesday, Wednesday"
     'Recurring Start Time'?: string;
@@ -63,6 +63,9 @@ export interface Cleaner {
     'Status'?: 'Active' | 'Inactive' | 'On Leave';
     'Hourly Rate'?: number;
     'Notes'?: string;
+    'Birthday'?: string;
+    'Work Anniversary'?: string;
+    'Address'?: string;
     'Last Job Date'?: string; // Rollup
     'Active Jobs Count'?: number; // Rollup
     'Average Tip Amount'?: number; // Rollup
@@ -94,7 +97,9 @@ export interface Job {
     'Bathrooms'?: number;
     'Service Type': 'General Clean' | 'Deep Clean' | 'Move-In-Out';
     'Is Recurring'?: boolean;
-    'Recurrence Frequency'?: 'Weekly' | 'Bi-weekly' | 'Monthly';
+    'Recurrence Frequency'?: 'Daily' | 'Weekly' | 'Bi-weekly' | 'Monthly';
+    'Recurring Day'?: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
+    'Recurring Days'?: string; // Comma-separated days like "Monday, Tuesday, Wednesday"
     'Next Cleaning Date'?: string;
     'Duration Hours'?: number; // NOTE: Schema calls this "Estimated Hours" but Airtable has "Duration Hours"
     'Client Hourly Rate'?: number;
@@ -332,6 +337,30 @@ export interface Lead {
     'Original Client'?: string[]; // Original client if churned re-entered as lead
     'Created Date'?: string;
     'Last Modified'?: string;
+  };
+}
+
+export interface Invoice {
+  id: string;
+  fields: {
+    'Invoice Number': string;
+    'Client': string[]; // Client record ID
+    'Job'?: string[]; // Optional Job record ID
+    'Status': 'Pending' | 'Paid' | 'Voided';
+    'Service Date': string;
+    'Service Type': 'General Clean' | 'Deep Clean' | 'Move-In-Out';
+    'Hours': number;
+    'Rate': number;
+    'Amount'?: number; // Calculated: Hours * Rate
+    'Due Date'?: string;
+    'Payment Method'?: 'Zelle' | 'Square' | 'Cash' | 'Credit Card' | 'Check';
+    'Payment Date'?: string;
+    'Notes'?: string;
+    'Sent Date'?: string;
+    'Client Name'?: string; // Lookup
+    'Client Email'?: string; // Lookup
+    'Client Address'?: string; // Lookup
+    'Created Date'?: string;
   };
 }
 

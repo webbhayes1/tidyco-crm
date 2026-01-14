@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { DataTable, Column } from '@/components/DataTable';
 import { StatusBadge } from '@/components/StatusBadge';
+import { MarkPaidButton } from '@/components/MarkPaidButton';
 import { Job } from '@/types/airtable';
 import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
@@ -31,19 +32,19 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
 
-  useEffect(() => {
-    async function fetchJobs() {
-      try {
-        const response = await fetch('/api/jobs');
-        const data = await response.json();
-        setJobs(data);
-      } catch (error) {
-        console.error('Failed to fetch jobs:', error);
-      } finally {
-        setLoading(false);
-      }
+  const fetchJobs = async () => {
+    try {
+      const response = await fetch('/api/jobs');
+      const data = await response.json();
+      setJobs(data);
+    } catch (error) {
+      console.error('Failed to fetch jobs:', error);
+    } finally {
+      setLoading(false);
     }
+  };
 
+  useEffect(() => {
     fetchJobs();
   }, []);
 
@@ -112,6 +113,30 @@ export default function JobsPage() {
         if (!score) return '-';
         const color = score >= 80 ? 'text-green-600' : score >= 70 ? 'text-yellow-600' : 'text-red-600';
         return <span className={`font-medium ${color}`}>{score}</span>;
+      },
+    },
+    {
+      key: 'Payment',
+      label: 'Payment',
+      render: (job) => {
+        // Only show for completed jobs
+        if (job.fields.Status !== 'Completed') {
+          return <span className="text-gray-400 text-xs">-</span>;
+        }
+        return (
+          <MarkPaidButton
+            jobId={job.id}
+            jobTitle={`Job #${job.fields['Job ID'] || job.id.slice(0, 8)}`}
+            currentPaymentStatus={job.fields['Payment Status'] || 'Pending'}
+            currentCleanerPaid={job.fields['Cleaner Paid'] || false}
+            amountCharged={job.fields['Amount Charged'] || 0}
+            cleanerPayout={0}
+            currentTip={job.fields['Tip Amount'] || 0}
+            cleanerCount={job.cleanerCount || 1}
+            variant="compact"
+            onSuccess={fetchJobs}
+          />
+        );
       },
     },
   ];

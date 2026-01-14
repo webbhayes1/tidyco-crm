@@ -1,5 +1,35 @@
 import { NextResponse } from 'next/server';
-import { updateCleaner, deleteCleaner } from '@/lib/airtable';
+import { getCleaner, updateCleaner, deleteCleaner } from '@/lib/airtable';
+
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const cleaner = await getCleaner(params.id);
+    if (!cleaner) {
+      return NextResponse.json({ error: 'Cleaner not found' }, { status: 404 });
+    }
+    return NextResponse.json(cleaner);
+  } catch (error) {
+    console.error('Error fetching cleaner:', error);
+    return NextResponse.json({ error: 'Failed to fetch cleaner' }, { status: 500 });
+  }
+}
+
+export async function PUT(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const body = await request.json();
+    const cleaner = await updateCleaner(params.id, body);
+    return NextResponse.json(cleaner);
+  } catch (error) {
+    console.error('Error updating cleaner:', error);
+    return NextResponse.json({ error: 'Failed to update cleaner' }, { status: 500 });
+  }
+}
 
 export async function PATCH(
   request: Request,

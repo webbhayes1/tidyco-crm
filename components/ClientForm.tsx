@@ -604,10 +604,14 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
                 className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg"
               >
                 <option value="">Select frequency...</option>
+                <option value="Daily">Daily (Select days below)</option>
                 <option value="Weekly">Weekly</option>
                 <option value="Bi-weekly">Bi-weekly (Every 2 weeks)</option>
                 <option value="Monthly">Monthly</option>
               </select>
+              {formData.recurrenceFrequency === 'Daily' && (
+                <p className="text-xs text-gray-500 mt-1">Select specific days of the week below for recurring cleanings</p>
+              )}
             </div>
 
             {/* Days of Week - Multi-select */}

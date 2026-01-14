@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import type { Job, Client, Cleaner, Team } from '@/types/airtable';
 import { Users2 } from 'lucide-react';
 
+// Days of the week for recurring selection
+const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
+
 interface JobFormProps {
   job?: Job;
   onSave: (data: Partial<Job['fields']>) => Promise<void>;
@@ -34,8 +37,15 @@ export function JobForm({ job, onSave, onCancel }: JobFormProps) {
     status: job?.fields.Status || 'Scheduled',
     isRecurring: job?.fields['Is Recurring'] || false,
     recurrenceFrequency: job?.fields['Recurrence Frequency'] || undefined,
+    recurringDay: job?.fields['Recurring Day'] || '',
     notes: job?.fields.Notes || '',
   });
+
+  // Toggle day selection for recurring jobs
+  const toggleDay = (day: string) => {
+    // For now, just set a single day (can expand to multi-day later if needed)
+    handleChange('recurringDay', formData.recurringDay === day ? '' : day);
+  };
 
   // Assignment type: 'individual' or 'team'
   const [assignmentType, setAssignmentType] = useState<'individual' | 'team'>(
@@ -107,6 +117,7 @@ export function JobForm({ job, onSave, onCancel }: JobFormProps) {
         Status: formData.status as 'Pending' | 'Scheduled' | 'In Progress' | 'Completed' | 'Cancelled',
         'Is Recurring': formData.isRecurring,
         'Recurrence Frequency': formData.recurrenceFrequency,
+        'Recurring Day': formData.recurringDay as Job['fields']['Recurring Day'] || undefined,
         Notes: formData.notes,
       };
 
@@ -466,16 +477,62 @@ export function JobForm({ job, onSave, onCancel }: JobFormProps) {
           </label>
 
           {formData.isRecurring && (
-            <select
-              value={formData.recurrenceFrequency || ''}
-              onChange={(e) => handleChange('recurrenceFrequency', e.target.value || undefined)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            >
-              <option value="">Select frequency...</option>
-              <option value="Weekly">Weekly</option>
-              <option value="Bi-weekly">Bi-Weekly</option>
-              <option value="Monthly">Monthly</option>
-            </select>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Frequency
+                </label>
+                <select
+                  value={formData.recurrenceFrequency || ''}
+                  onChange={(e) => handleChange('recurrenceFrequency', e.target.value || undefined)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">Select frequency...</option>
+                  <option value="Daily">Daily (Select days below)</option>
+                  <option value="Weekly">Weekly</option>
+                  <option value="Bi-weekly">Bi-Weekly</option>
+                  <option value="Monthly">Monthly</option>
+                </select>
+              </div>
+
+              {/* Day of Week Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {formData.recurrenceFrequency === 'Daily' ? 'Days of Week' : 'Day of Week'}
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {DAYS_OF_WEEK.map((day) => (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() => toggleDay(day)}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        formData.recurringDay === day
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {day.slice(0, 3)}
+                    </button>
+                  ))}
+                </div>
+                {formData.recurringDay && (
+                  <p className="text-sm text-gray-500 mt-2">
+                    Selected: {formData.recurringDay}
+                  </p>
+                )}
+              </div>
+
+              {/* Schedule Summary */}
+              {formData.recurrenceFrequency && formData.recurringDay && (
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <span className="font-medium">Schedule: </span>
+                    {formData.recurrenceFrequency} on {formData.recurringDay}s
+                  </p>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

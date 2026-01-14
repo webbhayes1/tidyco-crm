@@ -4,6 +4,8 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { DeleteJobButton } from '@/components/DeleteJobButton';
 import { RescheduleButton } from '@/components/RescheduleButton';
 import { MarkCompleteButton } from '@/components/MarkCompleteButton';
+import { MarkPaidButton } from '@/components/MarkPaidButton';
+import { CreateInvoiceButton } from '@/components/CreateInvoiceButton';
 import { getJob, getClient, getCleaner } from '@/lib/airtable';
 import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
@@ -78,6 +80,22 @@ export default async function JobDetailPage({ params }: { params: { id: string }
                 currentStatus={job.fields.Status}
                 currentTip={job.fields['Tip Amount']}
                 cleanerCount={validCleaners.length}
+              />
+              <MarkPaidButton
+                jobId={job.id}
+                jobTitle={jobTitle}
+                currentPaymentStatus={job.fields['Payment Status'] || 'Pending'}
+                currentCleanerPaid={job.fields['Cleaner Paid'] || false}
+                amountCharged={job.fields['Amount Charged'] || 0}
+                cleanerPayout={totalTeamPayout}
+              />
+              <CreateInvoiceButton
+                jobId={job.id}
+                clientId={clientId}
+                serviceDate={job.fields.Date || ''}
+                serviceType={job.fields['Service Type']}
+                hours={job.fields['Actual Hours'] || job.fields['Duration Hours'] || 0}
+                rate={job.fields['Client Hourly Rate'] || 50}
               />
               <RescheduleButton
                 jobId={job.id}

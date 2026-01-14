@@ -11,7 +11,8 @@ type Status =
   | 'Sent'
   | 'Accepted'
   | 'Rejected'
-  | 'Expired';
+  | 'Expired'
+  | 'Voided';
 
 const statusColors: Record<string, string> = {
   Pending: 'bg-yellow-100 text-yellow-800',
@@ -28,6 +29,7 @@ const statusColors: Record<string, string> = {
   Accepted: 'bg-green-100 text-green-800',
   Rejected: 'bg-red-100 text-red-800',
   Expired: 'bg-gray-100 text-gray-800',
+  Voided: 'bg-red-100 text-red-800',
 };
 
 interface StatusBadgeProps {

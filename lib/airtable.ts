@@ -12,6 +12,7 @@ import {
   CleanerTraining,
   Team,
   Lead,
+  Invoice,
 } from '@/types/airtable';
 
 // Initialize Airtable
@@ -35,6 +36,7 @@ const TABLES = {
   CLEANER_TRAINING: 'Cleaner Training',
   TEAMS: 'Teams',
   LEADS: 'Leads',
+  INVOICES: 'Invoices',
 } as const;
 
 // Helper function to convert Airtable record to our type
@@ -469,6 +471,74 @@ export async function findDuplicateLead(phone?: string, angiLeadId?: string): Pr
   const formula = conditions.length > 1 ? `OR(${conditions.join(', ')})` : conditions[0];
   const leads = await getLeads({ filterByFormula: formula, maxRecords: 1 });
   return leads.length > 0 ? leads[0] : null;
+}
+
+// ===== INVOICES =====
+export async function getInvoices(options?: {
+  view?: string;
+  filterByFormula?: string;
+  maxRecords?: number;
+}): Promise<Invoice[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const selectOptions: any = {
+    view: options?.view || 'Grid view',
+  };
+
+  if (options?.filterByFormula) {
+    selectOptions.filterByFormula = options.filterByFormula;
+  }
+  if (options?.maxRecords !== undefined) {
+    selectOptions.maxRecords = options.maxRecords;
+  }
+
+  const records = await base(TABLES.INVOICES).select(selectOptions).all();
+  return records.map(convertRecord<Invoice>);
+}
+
+export async function getInvoice(id: string): Promise<Invoice | null> {
+  try {
+    const record = await base(TABLES.INVOICES).find(id);
+    return convertRecord<Invoice>(record);
+  } catch (error) {
+    console.error('Error fetching invoice:', error);
+    return null;
+  }
+}
+
+export async function createInvoice(fields: Partial<Invoice['fields']>): Promise<Invoice> {
+  const record = await base(TABLES.INVOICES).create(fields as unknown as FieldSet);
+  return convertRecord<Invoice>(record);
+}
+
+export async function updateInvoice(id: string, fields: Partial<Invoice['fields']>): Promise<Invoice> {
+  const record = await base(TABLES.INVOICES).update(id, fields as unknown as FieldSet);
+  return convertRecord<Invoice>(record);
+}
+
+export async function deleteInvoice(id: string): Promise<void> {
+  await base(TABLES.INVOICES).destroy(id);
+}
+
+// Get invoices by status
+export async function getInvoicesByStatus(status: Invoice['fields']['Status']): Promise<Invoice[]> {
+  const formula = `{Status} = '${status}'`;
+  return getInvoices({ filterByFormula: formula });
+}
+
+// Get pending invoices
+export async function getPendingInvoices(): Promise<Invoice[]> {
+  return getInvoicesByStatus('Pending');
+}
+
+// Get next invoice number
+export async function getNextInvoiceNumber(): Promise<string> {
+  const invoices = await getInvoices();
+  const maxNum = invoices.reduce((max, inv) => {
+    const match = inv.fields['Invoice Number']?.match(/INV-(\d+)/);
+    const num = match ? parseInt(match[1], 10) : 0;
+    return num > max ? num : max;
+  }, 0);
+  return `INV-${String(maxNum + 1).padStart(4, '0')}`;
 }
 
 // ===== DASHBOARD METRICS =====

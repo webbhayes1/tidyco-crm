@@ -102,6 +102,9 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
     experienceLevel: cleaner?.fields['Experience Level'] || 'Junior',
     serviceAreaZipCodes: cleaner?.fields['Service Area Zip Codes'] || '',
     notes: cleaner?.fields.Notes || '',
+    birthday: cleaner?.fields.Birthday || '',
+    workAnniversary: cleaner?.fields['Work Anniversary'] || '',
+    address: cleaner?.fields.Address || '',
   });
 
   const [schedule, setSchedule] = useState<WeekSchedule>(() =>
@@ -128,6 +131,9 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
         'Preferred Hours': scheduleToString(schedule),
         'Service Area Zip Codes': formData.serviceAreaZipCodes,
         Notes: formData.notes,
+        Birthday: formData.birthday || undefined,
+        'Work Anniversary': formData.workAnniversary || undefined,
+        Address: formData.address || undefined,
       };
 
       // Only include email if provided
@@ -235,6 +241,19 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
           </div>
         </div>
 
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Address
+          </label>
+          <input
+            type="text"
+            value={formData.address}
+            onChange={(e) => handleChange('address', e.target.value)}
+            placeholder="123 Main St, Manhattan Beach, CA 90266"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+          />
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -264,6 +283,33 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
               <option value="Spanish">Spanish</option>
               <option value="Both">Both</option>
             </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Birthday
+            </label>
+            <input
+              type="date"
+              value={formData.birthday}
+              onChange={(e) => handleChange('birthday', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Work Anniversary
+            </label>
+            <input
+              type="date"
+              value={formData.workAnniversary}
+              onChange={(e) => handleChange('workAnniversary', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            />
+            <p className="text-xs text-gray-500 mt-1">Date they started working</p>
           </div>
         </div>
       </div>
