@@ -7,7 +7,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { Lead } from '@/types/airtable';
 import { format } from 'date-fns';
 import Link from 'next/link';
-import { Plus, Upload, Phone, Mail } from 'lucide-react';
+import { Plus, Upload, Phone, Mail, Link2, Copy, Check, ExternalLink } from 'lucide-react';
 
 type LeadStatus = 'New' | 'Contacted' | 'Qualified' | 'Quote Sent' | 'Won' | 'Lost' | 'Churned';
 
@@ -18,6 +18,7 @@ export default function LeadsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('active');
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showConnectModal, setShowConnectModal] = useState(false);
 
   const fetchLeads = useCallback(async () => {
     try {
@@ -176,6 +177,13 @@ export default function LeadsPage() {
         actions={
           <div className="flex space-x-2">
             <button
+              onClick={() => setShowConnectModal(true)}
+              className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm border border-gray-300 hover:bg-gray-50"
+            >
+              <Link2 className="mr-2 h-4 w-4" />
+              Connect Lead Source
+            </button>
+            <button
               onClick={() => setShowImportModal(true)}
               className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm border border-gray-300 hover:bg-gray-50"
             >
@@ -247,6 +255,11 @@ export default function LeadsPage() {
             fetchLeads();
           }}
         />
+      )}
+
+      {/* Connect Lead Source Modal */}
+      {showConnectModal && (
+        <ConnectLeadSourceModal onClose={() => setShowConnectModal(false)} />
       )}
     </div>
   );
@@ -530,6 +543,219 @@ function ImportLeadsModal({
               </button>
             )}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Connect Lead Source Modal
+function ConnectLeadSourceModal({ onClose }: { onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const [selectedSource, setSelectedSource] = useState<string | null>(null);
+
+  // Generate the webhook URL based on current host
+  const webhookUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/api/leads/webhook`
+    : 'https://tidyco-crm.vercel.app/api/leads/webhook';
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const leadSources = [
+    {
+      id: 'angi',
+      name: 'Angi (Angie\'s List)',
+      logo: '🏠',
+      color: 'bg-blue-500',
+      instructions: [
+        'Log in to your Angi Pro account',
+        'Go to Settings → Lead Integrations',
+        'Click "Add New Integration"',
+        'Enter the webhook URL below',
+        'Set Method to POST and Content-Type to application/json',
+        'Contact Angi support at crmintegrations@angi.com if needed',
+      ],
+    },
+    {
+      id: 'thumbtack',
+      name: 'Thumbtack',
+      logo: '📌',
+      color: 'bg-green-500',
+      instructions: [
+        'Log in to your Thumbtack Pro account',
+        'Go to Settings → Integrations',
+        'Look for "Webhook" or "API" settings',
+        'Enter the webhook URL below',
+        'Contact Thumbtack support for integration help',
+      ],
+    },
+    {
+      id: 'homeadvisor',
+      name: 'HomeAdvisor',
+      logo: '🏡',
+      color: 'bg-orange-500',
+      instructions: [
+        'Log in to your HomeAdvisor Pro account',
+        'Navigate to Lead Settings',
+        'Find API/Webhook integration options',
+        'Enter the webhook URL below',
+        'Contact HomeAdvisor support for setup assistance',
+      ],
+    },
+    {
+      id: 'custom',
+      name: 'Custom / Other',
+      logo: '⚙️',
+      color: 'bg-gray-500',
+      instructions: [
+        'Use the webhook URL below in your lead source',
+        'Send a POST request with JSON body',
+        'Required field: name',
+        'Optional: email, phone, address, city, state, zip, service_type, notes',
+      ],
+    },
+  ];
+
+  const selectedSourceData = leadSources.find(s => s.id === selectedSource);
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold">Connect Lead Source</h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              ✕
+            </button>
+          </div>
+
+          {!selectedSource ? (
+            <>
+              <p className="text-sm text-gray-600 mb-4">
+                Connect your lead sources to automatically import leads into your CRM.
+              </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                {leadSources.map((source) => (
+                  <button
+                    key={source.id}
+                    onClick={() => setSelectedSource(source.id)}
+                    className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors text-left"
+                  >
+                    <span className={`w-10 h-10 ${source.color} rounded-lg flex items-center justify-center text-white text-xl mr-3`}>
+                      {source.logo}
+                    </span>
+                    <span className="font-medium text-gray-900">{source.name}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => setSelectedSource(null)}
+                className="text-sm text-primary-600 hover:text-primary-700 mb-4 flex items-center"
+              >
+                ← Back to sources
+              </button>
+
+              <div className="flex items-center mb-4">
+                <span className={`w-10 h-10 ${selectedSourceData?.color} rounded-lg flex items-center justify-center text-white text-xl mr-3`}>
+                  {selectedSourceData?.logo}
+                </span>
+                <h3 className="text-lg font-semibold">{selectedSourceData?.name}</h3>
+              </div>
+
+              {/* Webhook URL */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Your Webhook URL
+                </label>
+                <div className="flex">
+                  <input
+                    type="text"
+                    readOnly
+                    value={webhookUrl}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md bg-gray-50 text-sm font-mono"
+                  />
+                  <button
+                    onClick={() => handleCopy(webhookUrl)}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-r-md hover:bg-primary-700 flex items-center"
+                  >
+                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Provide this URL to your lead vendor for automatic lead import
+                </p>
+              </div>
+
+              {/* API Details */}
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-medium text-sm mb-2">API Details</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex">
+                    <span className="text-gray-500 w-24">Method:</span>
+                    <span className="font-mono">POST</span>
+                  </div>
+                  <div className="flex">
+                    <span className="text-gray-500 w-24">Content-Type:</span>
+                    <span className="font-mono">application/json</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Instructions */}
+              <div className="mb-6">
+                <h4 className="font-medium text-sm mb-2">Setup Instructions</h4>
+                <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
+                  {selectedSourceData?.instructions.map((instruction, i) => (
+                    <li key={i}>{instruction}</li>
+                  ))}
+                </ol>
+              </div>
+
+              {/* Sample JSON */}
+              {selectedSource === 'custom' && (
+                <div className="mb-6">
+                  <h4 className="font-medium text-sm mb-2">Sample JSON Payload</h4>
+                  <pre className="p-3 bg-gray-900 text-green-400 rounded-lg text-xs overflow-x-auto">
+{`{
+  "name": "John Smith",
+  "email": "john@example.com",
+  "phone": "555-123-4567",
+  "address": "123 Main St",
+  "city": "Los Angeles",
+  "state": "CA",
+  "zip": "90210",
+  "service_type": "General Clean",
+  "notes": "2 bedroom apartment"
+}`}
+                  </pre>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-4 border-t">
+                <a
+                  href="mailto:support@tidyco.com?subject=Lead Integration Help"
+                  className="text-sm text-primary-600 hover:text-primary-700 flex items-center"
+                >
+                  <ExternalLink className="h-4 w-4 mr-1" />
+                  Need help? Contact support
+                </a>
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-500"
+                >
+                  Done
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
