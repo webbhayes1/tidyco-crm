@@ -302,8 +302,21 @@ function ImportLeadsModal({
     const lines = csv.trim().split('\n');
     if (lines.length < 2) return [];
 
-    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    // Auto-detect delimiter: tab vs comma
+    const firstLine = lines[0];
+    const tabCount = (firstLine.match(/\t/g) || []).length;
+    const commaCount = (firstLine.match(/,/g) || []).length;
+    const delimiter = tabCount > commaCount ? '\t' : ',';
+
+    const headers = lines[0].split(delimiter).map(h => h.trim().replace(/"/g, ''));
     const leads: Lead['fields'][] = [];
+
+    // Detect if this is an Angi export (has Angi-specific headers)
+    const isAngiExport = headers.some(h =>
+      h.toLowerCase().includes('lead number') ||
+      h.toLowerCase().includes('lead fee') ||
+      h.toLowerCase().includes('customer first name')
+    );
 
     // Helper to check if header matches any of the patterns
     const headerMatches = (header: string, patterns: string[]): boolean => {
@@ -311,13 +324,27 @@ function ImportLeadsModal({
       return patterns.some(p => h === p || h.includes(p));
     };
 
+    // Helper to add to notes
+    const addToNotes = (lead: Lead['fields'], note: string) => {
+      if (lead.Notes) {
+        lead.Notes = `${lead.Notes}\n${note}`;
+      } else {
+        lead.Notes = note;
+      }
+    };
+
     for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+      const values = lines[i].split(delimiter).map(v => v.trim().replace(/"/g, ''));
       const lead: Lead['fields'] = { Name: '' };
 
       // Track first/last name separately for combining
       let firstName = '';
       let lastName = '';
+
+      // If this is an Angi export, auto-set lead source
+      if (isAngiExport) {
+        lead['Lead Source'] = 'Angi';
+      }
 
       headers.forEach((header, index) => {
         const value = values[index];
@@ -400,18 +427,56 @@ function ImportLeadsModal({
           }
         }
 
-        // SERVICE TYPE
-        else if (headerMatches(header, ['service', 'service type', 'service interested', 'service needed', 'type of service', 'cleaning type', 'job type', 'project type', 'category'])) {
+        // SERVICE TYPE / LEAD TYPE (Angi uses "Lead Type")
+        else if (headerMatches(header, ['service', 'service type', 'service interested', 'service needed', 'type of service', 'cleaning type', 'job type', 'project type', 'category', 'lead type'])) {
           const v = value.toLowerCase();
           if (v.includes('deep') || v.includes('thorough') || v.includes('detailed')) {
             lead['Service Type Interested'] = 'Deep Clean';
           } else if (v.includes('move') || v.includes('moving') || v.includes('move out') || v.includes('move in')) {
             lead['Service Type Interested'] = 'Move-In-Out';
-          } else if (v.includes('general') || v.includes('standard') || v.includes('regular') || v.includes('basic') || v.includes('routine')) {
+          } else if (v.includes('general') || v.includes('standard') || v.includes('regular') || v.includes('basic') || v.includes('routine') || v.includes('house cleaning') || v.includes('home cleaning')) {
             lead['Service Type Interested'] = 'General Clean';
           } else if (['General Clean', 'Deep Clean', 'Move-In-Out'].includes(value)) {
             lead['Service Type Interested'] = value as Lead['fields']['Service Type Interested'];
+          } else if (value) {
+            // Store the original lead type in notes if we can't map it
+            addToNotes(lead, `Service requested: ${value}`);
           }
+        }
+
+        // LEAD STATUS (from source - map to our status if possible)
+        else if (headerMatches(header, ['lead status', 'status', 'lead state'])) {
+          const v = value.toLowerCase();
+          // Map common source statuses to our statuses
+          if (v.includes('new') || v.includes('unread') || v.includes('pending')) {
+            lead.Status = 'New';
+          } else if (v.includes('contact') || v.includes('reach') || v.includes('call')) {
+            lead.Status = 'Contacted';
+          } else if (v.includes('quote') || v.includes('estimate') || v.includes('bid')) {
+            lead.Status = 'Quote Sent';
+          } else if (v.includes('book') || v.includes('schedul') || v.includes('confirm') || v.includes('won')) {
+            lead.Status = 'Won';
+          } else if (v.includes('lost') || v.includes('dead') || v.includes('closed') || v.includes('decline')) {
+            lead.Status = 'Lost';
+          } else {
+            // Store original status in notes
+            addToNotes(lead, `Original status: ${value}`);
+          }
+        }
+
+        // LEAD DESCRIPTION (Angi specific - goes to notes)
+        else if (headerMatches(header, ['lead description', 'description', 'project description', 'job description', 'work description', 'service description'])) {
+          addToNotes(lead, value);
+        }
+
+        // LEAD NUMBER / LEAD ID (Angi specific)
+        else if (headerMatches(header, ['lead number', 'lead num', 'lead #', 'angi lead id', 'angi id', 'lead id', 'homeadvisor id', 'ha id', 'external id', 'reference id', 'ref id', 'ref #', 'reference #', 'id'])) {
+          lead['Angi Lead ID'] = value;
+        }
+
+        // LEAD FEE (Angi specific - store in notes for reference)
+        else if (headerMatches(header, ['lead fee', 'fee', 'cost', 'lead cost', 'price', 'lead price'])) {
+          addToNotes(lead, `Lead fee: ${value}`);
         }
 
         // BEDROOMS
@@ -430,38 +495,18 @@ function ImportLeadsModal({
         else if (headerMatches(header, ['sqft', 'square feet', 'square footage', 'sq ft', 'size', 'home size', 'property size'])) {
           const num = parseInt(value.replace(/[^0-9]/g, ''));
           if (num > 0) {
-            const sqftNote = `Square footage: ${num}`;
-            if (lead.Notes) {
-              lead.Notes = `${lead.Notes}\n${sqftNote}`;
-            } else {
-              lead.Notes = sqftNote;
-            }
+            addToNotes(lead, `Square footage: ${num}`);
           }
         }
 
         // NOTES/COMMENTS
-        else if (headerMatches(header, ['notes', 'comments', 'message', 'description', 'details', 'additional info', 'additional information', 'special instructions', 'customer notes', 'project description', 'job description', 'request'])) {
-          if (lead.Notes) {
-            lead.Notes = `${lead.Notes}\n${value}`;
-          } else {
-            lead.Notes = value;
-          }
-        }
-
-        // ANGI LEAD ID
-        else if (headerMatches(header, ['angi lead id', 'angi id', 'lead id', 'homeadvisor id', 'ha id', 'external id', 'reference id', 'ref id'])) {
-          lead['Angi Lead ID'] = value;
+        else if (headerMatches(header, ['notes', 'comments', 'message', 'details', 'additional info', 'additional information', 'special instructions', 'customer notes', 'request', 'customer message', 'inquiry'])) {
+          addToNotes(lead, value);
         }
 
         // DATE FIELDS (for reference/notes)
-        else if (headerMatches(header, ['date', 'created', 'submitted', 'lead date', 'inquiry date', 'request date'])) {
-          // Add to notes if we have a date
-          const dateNote = `Lead received: ${value}`;
-          if (lead.Notes) {
-            lead.Notes = `${lead.Notes}\n${dateNote}`;
-          } else {
-            lead.Notes = dateNote;
-          }
+        else if (headerMatches(header, ['date', 'created', 'submitted', 'lead date', 'inquiry date', 'request date', 'created date', 'submission date'])) {
+          addToNotes(lead, `Lead received: ${value}`);
         }
       });
 
@@ -472,7 +517,10 @@ function ImportLeadsModal({
 
       // Only add if we have at least a name
       if (lead.Name) {
-        lead.Status = 'New'; // Default status
+        // Set default status if not already set from source
+        if (!lead.Status) {
+          lead.Status = 'New';
+        }
         leads.push(lead);
       }
     }
