@@ -305,76 +305,170 @@ function ImportLeadsModal({
     const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
     const leads: Lead['fields'][] = [];
 
+    // Helper to check if header matches any of the patterns
+    const headerMatches = (header: string, patterns: string[]): boolean => {
+      const h = header.toLowerCase().replace(/[_-]/g, ' ').trim();
+      return patterns.some(p => h === p || h.includes(p));
+    };
+
     for (let i = 1; i < lines.length; i++) {
       const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
       const lead: Lead['fields'] = { Name: '' };
+
+      // Track first/last name separately for combining
+      let firstName = '';
+      let lastName = '';
 
       headers.forEach((header, index) => {
         const value = values[index];
         if (!value) return;
 
-        // Map common CSV headers to our field names
-        switch (header.toLowerCase()) {
-          case 'name':
-          case 'full name':
-          case 'customer name':
-            lead.Name = value;
-            break;
-          case 'email':
-          case 'email address':
-            lead.Email = value;
-            break;
-          case 'phone':
-          case 'phone number':
-          case 'mobile':
-            lead.Phone = value;
-            break;
-          case 'address':
-          case 'street address':
+        // NAME FIELDS - Handle various formats
+        // Full name patterns
+        if (headerMatches(header, ['full name', 'fullname', 'name', 'customer name', 'client name', 'contact name', 'lead name'])) {
+          lead.Name = value;
+        }
+        // First name patterns (from Angi, Thumbtack, etc.)
+        else if (headerMatches(header, ['first name', 'firstname', 'customer first name', 'client first name', 'fname', 'given name'])) {
+          firstName = value;
+        }
+        // Last name patterns
+        else if (headerMatches(header, ['last name', 'lastname', 'customer last name', 'client last name', 'lname', 'surname', 'family name'])) {
+          lastName = value;
+        }
+
+        // EMAIL FIELDS
+        else if (headerMatches(header, ['email', 'email address', 'e mail', 'customer email', 'client email', 'contact email'])) {
+          lead.Email = value;
+        }
+
+        // PHONE FIELDS
+        else if (headerMatches(header, ['phone', 'phone number', 'mobile', 'cell', 'telephone', 'tel', 'customer phone', 'client phone', 'contact phone', 'primary phone', 'home phone', 'cell phone', 'mobile phone'])) {
+          lead.Phone = value;
+        }
+
+        // ADDRESS FIELDS
+        else if (headerMatches(header, ['address', 'street address', 'street', 'address line 1', 'address1', 'customer address', 'service address', 'property address'])) {
+          lead.Address = value;
+        }
+        else if (headerMatches(header, ['address line 2', 'address2', 'apt', 'unit', 'suite'])) {
+          // Append to existing address
+          if (lead.Address) {
+            lead.Address = `${lead.Address}, ${value}`;
+          } else {
             lead.Address = value;
-            break;
-          case 'city':
-            lead.City = value;
-            break;
-          case 'state':
-            lead.State = value;
-            break;
-          case 'zip':
-          case 'zip code':
-          case 'zipcode':
-            lead['Zip Code'] = value;
-            break;
-          case 'source':
-          case 'lead source':
-            if (['Angi', 'Referral', 'Direct', 'Google', 'Facebook', 'Thumbtack', 'Other'].includes(value)) {
-              lead['Lead Source'] = value as Lead['fields']['Lead Source'];
+          }
+        }
+
+        // CITY
+        else if (headerMatches(header, ['city', 'town', 'customer city', 'service city'])) {
+          lead.City = value;
+        }
+
+        // STATE
+        else if (headerMatches(header, ['state', 'province', 'region', 'customer state', 'service state'])) {
+          lead.State = value;
+        }
+
+        // ZIP CODE
+        else if (headerMatches(header, ['zip', 'zip code', 'zipcode', 'postal', 'postal code', 'postcode', 'customer zip', 'service zip'])) {
+          lead['Zip Code'] = value;
+        }
+
+        // LEAD SOURCE
+        else if (headerMatches(header, ['source', 'lead source', 'referral source', 'how did you hear', 'marketing source', 'channel'])) {
+          // Try to match to our known sources
+          const v = value.toLowerCase();
+          if (v.includes('angi') || v.includes('angie')) {
+            lead['Lead Source'] = 'Angi';
+          } else if (v.includes('thumbtack')) {
+            lead['Lead Source'] = 'Thumbtack';
+          } else if (v.includes('google')) {
+            lead['Lead Source'] = 'Google';
+          } else if (v.includes('facebook') || v.includes('fb') || v.includes('meta')) {
+            lead['Lead Source'] = 'Facebook';
+          } else if (v.includes('referral') || v.includes('friend') || v.includes('word of mouth')) {
+            lead['Lead Source'] = 'Referral';
+          } else if (v.includes('yelp')) {
+            lead['Lead Source'] = 'Yelp' as Lead['fields']['Lead Source'];
+          } else if (v.includes('nextdoor')) {
+            lead['Lead Source'] = 'Nextdoor' as Lead['fields']['Lead Source'];
+          } else if (['Angi', 'Referral', 'Direct', 'Google', 'Facebook', 'Thumbtack', 'Yelp', 'Nextdoor', 'Other'].includes(value)) {
+            lead['Lead Source'] = value as Lead['fields']['Lead Source'];
+          } else {
+            lead['Lead Source'] = 'Other';
+          }
+        }
+
+        // SERVICE TYPE
+        else if (headerMatches(header, ['service', 'service type', 'service interested', 'service needed', 'type of service', 'cleaning type', 'job type', 'project type', 'category'])) {
+          const v = value.toLowerCase();
+          if (v.includes('deep') || v.includes('thorough') || v.includes('detailed')) {
+            lead['Service Type Interested'] = 'Deep Clean';
+          } else if (v.includes('move') || v.includes('moving') || v.includes('move out') || v.includes('move in')) {
+            lead['Service Type Interested'] = 'Move-In-Out';
+          } else if (v.includes('general') || v.includes('standard') || v.includes('regular') || v.includes('basic') || v.includes('routine')) {
+            lead['Service Type Interested'] = 'General Clean';
+          } else if (['General Clean', 'Deep Clean', 'Move-In-Out'].includes(value)) {
+            lead['Service Type Interested'] = value as Lead['fields']['Service Type Interested'];
+          }
+        }
+
+        // BEDROOMS
+        else if (headerMatches(header, ['bedrooms', 'beds', 'bed', 'bedroom count', 'num bedrooms', 'number of bedrooms', 'br'])) {
+          const num = parseInt(value.replace(/[^0-9]/g, ''));
+          if (num > 0) lead.Bedrooms = num;
+        }
+
+        // BATHROOMS
+        else if (headerMatches(header, ['bathrooms', 'baths', 'bath', 'bathroom count', 'num bathrooms', 'number of bathrooms', 'ba'])) {
+          const num = parseFloat(value.replace(/[^0-9.]/g, ''));
+          if (num > 0) lead.Bathrooms = num;
+        }
+
+        // SQUARE FOOTAGE (add to notes since not a dedicated field)
+        else if (headerMatches(header, ['sqft', 'square feet', 'square footage', 'sq ft', 'size', 'home size', 'property size'])) {
+          const num = parseInt(value.replace(/[^0-9]/g, ''));
+          if (num > 0) {
+            const sqftNote = `Square footage: ${num}`;
+            if (lead.Notes) {
+              lead.Notes = `${lead.Notes}\n${sqftNote}`;
+            } else {
+              lead.Notes = sqftNote;
             }
-            break;
-          case 'service':
-          case 'service type':
-          case 'service interested':
-            if (['General Clean', 'Deep Clean', 'Move-In-Out'].includes(value)) {
-              lead['Service Type Interested'] = value as Lead['fields']['Service Type Interested'];
-            }
-            break;
-          case 'bedrooms':
-          case 'beds':
-            lead.Bedrooms = parseInt(value) || undefined;
-            break;
-          case 'bathrooms':
-          case 'baths':
-            lead.Bathrooms = parseFloat(value) || undefined;
-            break;
-          case 'notes':
-          case 'comments':
+          }
+        }
+
+        // NOTES/COMMENTS
+        else if (headerMatches(header, ['notes', 'comments', 'message', 'description', 'details', 'additional info', 'additional information', 'special instructions', 'customer notes', 'project description', 'job description', 'request'])) {
+          if (lead.Notes) {
+            lead.Notes = `${lead.Notes}\n${value}`;
+          } else {
             lead.Notes = value;
-            break;
-          case 'angi lead id':
-          case 'angi id':
-            lead['Angi Lead ID'] = value;
-            break;
+          }
+        }
+
+        // ANGI LEAD ID
+        else if (headerMatches(header, ['angi lead id', 'angi id', 'lead id', 'homeadvisor id', 'ha id', 'external id', 'reference id', 'ref id'])) {
+          lead['Angi Lead ID'] = value;
+        }
+
+        // DATE FIELDS (for reference/notes)
+        else if (headerMatches(header, ['date', 'created', 'submitted', 'lead date', 'inquiry date', 'request date'])) {
+          // Add to notes if we have a date
+          const dateNote = `Lead received: ${value}`;
+          if (lead.Notes) {
+            lead.Notes = `${lead.Notes}\n${dateNote}`;
+          } else {
+            lead.Notes = dateNote;
+          }
         }
       });
+
+      // Combine first + last name if no full name was found
+      if (!lead.Name && (firstName || lastName)) {
+        lead.Name = [firstName, lastName].filter(Boolean).join(' ');
+      }
 
       // Only add if we have at least a name
       if (lead.Name) {
@@ -391,7 +485,7 @@ function ImportLeadsModal({
     try {
       const parsed = parseCSV(csvData);
       if (parsed.length === 0) {
-        setError('No valid leads found in CSV. Make sure you have a header row with "Name" column.');
+        setError('No valid leads found in CSV. Make sure you have a header row with a name column (e.g., "Name", "First Name", "Customer First Name", etc.).');
         return;
       }
       setPreview(parsed);
@@ -433,10 +527,10 @@ function ImportLeadsModal({
 
           <div className="mb-4">
             <p className="text-sm text-gray-600 mb-2">
-              Upload a CSV file or paste data below. Required column: <strong>Name</strong>
+              Upload a CSV file or paste data below. Required: <strong>Name</strong> (or First Name + Last Name)
             </p>
             <p className="text-sm text-gray-500 mb-3">
-              Supported columns: Name, Email, Phone, Address, City, State, Zip Code, Source, Service Type, Bedrooms, Bathrooms, Notes, Angi Lead ID
+              Works with exports from Angi, Thumbtack, Yelp, and more. Supports various header formats like &quot;Customer First Name&quot;, &quot;Phone Number&quot;, etc.
             </p>
 
             {/* File Upload */}
