@@ -29,6 +29,13 @@ export async function GET() {
       };
     });
 
+    // Sort by date ascending
+    enrichedJobs.sort((a, b) => {
+      const dateA = a.fields.Date || '';
+      const dateB = b.fields.Date || '';
+      return dateA.localeCompare(dateB);
+    });
+
     return NextResponse.json(enrichedJobs);
   } catch (error) {
     console.error('Error fetching jobs:', error);
