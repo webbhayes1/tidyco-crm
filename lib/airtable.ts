@@ -328,6 +328,21 @@ export async function updateQuote(id: string, fields: Partial<Quote['fields']>):
   return convertRecord<Quote>(record);
 }
 
+export async function createQuote(fields: Partial<Quote['fields']>): Promise<Quote> {
+  const record = await base(TABLES.QUOTES).create(fields as FieldSet);
+  return convertRecord<Quote>(record);
+}
+
+export async function deleteQuote(id: string): Promise<boolean> {
+  try {
+    await base(TABLES.QUOTES).destroy(id);
+    return true;
+  } catch (error) {
+    console.error('Error deleting quote:', error);
+    return false;
+  }
+}
+
 // ===== TRAINING MODULES =====
 export async function getTrainingModules(view?: string): Promise<TrainingModule[]> {
   const records = await base(TABLES.TRAINING_MODULES)

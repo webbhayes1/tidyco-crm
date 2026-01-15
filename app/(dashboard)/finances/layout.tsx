@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, FileText } from 'lucide-react';
+import { BarChart3, FileText, ClipboardList } from 'lucide-react';
 
 const tabs = [
   { name: 'Overview', href: '/finances/overview', icon: BarChart3 },
   { name: 'Invoices', href: '/finances/invoices', icon: FileText },
+  { name: 'Quotes', href: '/finances/quotes', icon: ClipboardList },
 ];
 
 export default function FinancesLayout({

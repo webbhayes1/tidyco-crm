@@ -1,85 +1,50 @@
 # Custom CRM Session Handoff
 
 **Date**: 2026-01-14
-**Session**: 18 (Lead Management Enhancement)
+**Session**: 19 (Quotes Reorganization)
 **Implementation**: Custom (Next.js)
-**Focus Area**: Disposition Tags, Activity Timeline, Win/Loss Reasons
+**Focus Area**: Move Quotes under Finances section
 
 ---
 
 ## Session Summary
 
-Enhanced the lead detail page with four major features: Disposition Tags for categorizing leads, Activity Timeline for tracking all interactions and notes, Win/Loss Reason modals for status changes, and improved Follow-up Reminders with activity logging.
+Moved the Quotes functionality from a standalone top-level page to a subtab under Finances, alongside Invoices. Built out complete CRUD pages for Quotes that were previously missing.
 
 ---
 
 ## What Was Accomplished
 
-### 1. Airtable Tables Created
+### 1. Quotes Moved Under Finances
 
-**Disposition Tags** (`tblRZ7ujey1NXlSVO`)
-- Fields: Name, Color (8 color options), Description, Active
-- Purpose: Custom tags for categorizing leads (e.g., "Hot Lead", "Left Voicemail")
+**Before**: `/quotes` was a standalone nav item
+**After**: `/finances/quotes` as a subtab alongside Overview and Invoices
 
-**Lead Activities** (`tblYCLGHCfQcPm9XN`)
-- Fields: Description, Type (Note, Call, Email, SMS, Meeting, Quote Sent, Status Change, Follow-up), Created By, Activity Date, Lead (linked)
-- Purpose: Timeline of all interactions with a lead
+### 2. Full Quotes CRUD Built
 
-### 2. Leads Table Fields Added
+| Page | Path | Description |
+|------|------|-------------|
+| List | `/finances/quotes` | Stats cards, status filters, sortable table |
+| Detail | `/finances/quotes/[id]` | Full quote view with status management, timeline, client info |
+| New | `/finances/quotes/new` | Form with client selection, auto-pricing calculator |
+| Edit | `/finances/quotes/[id]/edit` | Edit form with all quote fields |
 
-- `Disposition Tags` (linked to Disposition Tags table) - `fldigri7rJEPD4DRq`
-- `Won Reason` (single select: Good Price, Quality Service, Fast Response, Good Reviews, Referral Trust, Availability, Other) - `fldLcHLgcLz3w94Lx`
-- `Activities` (inverse link from Lead Activities) - `fldhw3Hw3Ie3AlQm2`
-
-**Note**: Lost Reason and Next Follow-Up Date fields already existed in the Leads table.
-
-### 3. TypeScript Interfaces Added
-
-**In `types/airtable.ts`:**
-- `DispositionTag` - Tag with name, color, description, active status
-- `LeadActivity` - Activity with description, type, created by, date, lead link
-- Updated `Lead` interface with Disposition Tags, Won Reason, Activities fields
-
-### 4. Airtable CRUD Functions Added
-
-**In `lib/airtable.ts`:**
-- Disposition Tags: CRUD + getActiveDispositionTags
-- Lead Activities: CRUD + getActivitiesForLead, getRecentLeadActivities
-
-### 5. API Routes Created
+### 3. API Routes Added
 
 | Route | Methods | Purpose |
 |-------|---------|---------|
-| `/api/leads/disposition-tags` | GET, POST | List and create tags |
-| `/api/leads/disposition-tags/[id]` | GET, PUT, DELETE | Single tag CRUD |
-| `/api/leads/activities` | GET, POST | List activities (supports ?leadId= and ?recent=true) |
-| `/api/leads/activities/[id]` | GET, PUT, DELETE | Single activity CRUD |
+| `/api/quotes/[id]` | GET, PUT, PATCH, DELETE | Single quote CRUD operations |
 
-### 6. Lead Detail Page Enhancements
+### 4. Airtable Functions Added
 
-**Disposition Tags:**
-- Tags display in header row next to status badge
-- Color-coded pills with X to remove
-- "Add Tag" button opens modal to select/toggle tags
-- Tags modal shows all active tags with checkmarks for selected
+In `lib/airtable.ts`:
+- `createQuote(fields)` - Create new quote record
+- `deleteQuote(id)` - Delete quote record
 
-**Activity Timeline:**
-- Full timeline view with icons for each activity type
-- Add note textarea with "Add Note" button
-- Quick "Log Call" and "Log Text" buttons
-- Activities sorted by date (most recent first)
-- Shows relative time ("2 hours ago")
+### 5. Navigation Updated
 
-**Win/Loss Reason Modal:**
-- When clicking "Won" or "Lost" status, modal appears
-- Presents reason options as buttons to select
-- Logs activity with status change reason
-- Displays reason in colored card on sidebar (green for Won, red for Lost)
-
-**Follow-up Improvements:**
-- Setting a follow-up now logs an activity
-- +1d, +3d, +7d quick buttons still work
-- Activity shows "Follow-up scheduled for [date]"
+- Removed "Quotes" from main navigation bar
+- Added "Quotes" tab to Finances layout (3 tabs: Overview | Invoices | Quotes)
 
 ---
 
@@ -87,95 +52,91 @@ Enhanced the lead detail page with four major features: Disposition Tags for cat
 
 | File | Description |
 |------|-------------|
-| `app/api/leads/disposition-tags/route.ts` | Tags list/create API |
-| `app/api/leads/disposition-tags/[id]/route.ts` | Single tag CRUD API |
-| `app/api/leads/activities/route.ts` | Activities list/create API |
-| `app/api/leads/activities/[id]/route.ts` | Single activity CRUD API |
+| `app/(dashboard)/finances/quotes/page.tsx` | Quotes list page |
+| `app/(dashboard)/finances/quotes/[id]/page.tsx` | Quote detail page |
+| `app/(dashboard)/finances/quotes/new/page.tsx` | New quote form |
+| `app/(dashboard)/finances/quotes/[id]/edit/page.tsx` | Edit quote form |
+| `app/api/quotes/[id]/route.ts` | Single quote API |
 
 ## Files Modified
 
 | File | Changes |
 |------|---------|
-| `types/airtable.ts` | Added DispositionTag, LeadActivity interfaces; updated Lead |
-| `lib/airtable.ts` | Added CRUD functions for 2 new tables |
-| `app/(dashboard)/leads/[id]/page.tsx` | Complete rewrite with tags, timeline, modals |
-| `.claude/decisions/airtable-changelog.md` | Logged 2 new tables and 2 new fields |
+| `app/(dashboard)/finances/layout.tsx` | Added Quotes tab |
+| `app/api/quotes/route.ts` | Added POST method |
+| `components/Navigation.tsx` | Removed Quotes from main nav |
+| `lib/airtable.ts` | Added createQuote, deleteQuote functions |
+
+## Files Deleted
+
+| File | Reason |
+|------|--------|
+| `app/(dashboard)/quotes/page.tsx` | Replaced by `/finances/quotes` |
 
 ---
 
 ## Build Status
 
-✅ Build completed successfully (47 pages generated)
+✅ Build completed successfully (51 pages generated)
 
+New pages in build output:
 ```
-├ ƒ /leads/[id]                          8.34 kB         109 kB
-├ ƒ /api/leads/activities                0 B                0 B
-├ ƒ /api/leads/activities/[id]           0 B                0 B
-├ ƒ /api/leads/disposition-tags          0 B                0 B
-├ ƒ /api/leads/disposition-tags/[id]     0 B                0 B
+├ ○ /finances/quotes                     2.59 kB         103 kB
+├ ƒ /finances/quotes/[id]                3.76 kB         104 kB
+├ ƒ /finances/quotes/[id]/edit           3.23 kB        97.2 kB
+├ ○ /finances/quotes/new                 3.12 kB          97 kB
 ```
 
 ---
 
-## Key Table/Field IDs (New)
+## Quote Features
 
-| Entity | ID |
-|--------|-----|
-| Disposition Tags table | `tblRZ7ujey1NXlSVO` |
-| Lead Activities table | `tblYCLGHCfQcPm9XN` |
-| Lead → Disposition Tags field | `fldigri7rJEPD4DRq` |
-| Lead → Won Reason field | `fldLcHLgcLz3w94Lx` |
-| Lead → Activities field (inverse) | `fldhw3Hw3Ie3AlQm2` |
-| Lead Activities → Lead field | `fldprkBWEQUw1PO3k` |
+### List Page
+- Stats: Total quotes, Pending/Sent count, Conversion rate, Accepted value
+- Status filters: All, Pending, Sent, Accepted, Rejected, Expired
+- Table with: Quote name, Client, Service type, Price, Status, Created date
+- Click row to view detail
+
+### Detail Page
+- Full quote info: Service type, hours, rate, price
+- Property details: Address, bedrooms, bathrooms
+- Status management: Click to update status
+- Timeline: Created, Sent, Expires, Response dates
+- Quick actions: Convert to Job (for Accepted), Edit, Delete
+- Client card with link
+
+### New/Edit Forms
+- Client dropdown with auto-fill (address, bedrooms, bathrooms, rate from client)
+- Service type selection
+- Property details (bedrooms, bathrooms)
+- Address and zip code
+- Hourly rate with price calculator preview
+- Quote notes (visible to client) and internal notes
+
+### Pricing Calculator
+Estimated hours formula:
+- General Clean: 1.5 base + (bedrooms * 0.5) + (bathrooms * 0.3)
+- Deep Clean: 3 base + (bedrooms * 0.5) + (bathrooms * 0.3)
+- Move-In-Out: 4 base + (bedrooms * 0.5) + (bathrooms * 0.3)
+
+Price = Estimated Hours × Hourly Rate
 
 ---
 
-## Still Needed (Not Implemented)
+## No Airtable Changes
 
-### Tag Management UI
-- [ ] Settings page to create/edit/delete disposition tags
-- [ ] Currently tags must be created directly in Airtable
-
-### Pipeline View Tag Filter
-- [ ] Filter leads by disposition tag in pipeline view
-- [ ] Tag column or badges in pipeline list view
-
-### Activity Types Extensions
-- [ ] Email activity with integration
-- [ ] Meeting scheduling with calendar integration
-
----
-
-## Usage Notes
-
-### Creating Disposition Tags
-
-Currently, tags need to be created in Airtable directly:
-1. Go to Disposition Tags table
-2. Add new record with Name, Color, Description
-3. Set Active = true
-4. Tags will appear in the lead detail modal
-
-### Activity Types
-
-| Type | When Used |
-|------|-----------|
-| Note | Manual note added by user |
-| Call | "Log Call" button clicked |
-| SMS | "Log Text" button clicked |
-| Status Change | Status changed (auto-logged) |
-| Follow-up | Follow-up scheduled (auto-logged) |
+This session only reorganized existing functionality. No Airtable schema changes were made.
 
 ---
 
 ## Next Session Recommendations
 
-1. **Tag Management UI** - Build settings page to manage disposition tags from the CRM
-2. **Pipeline View Tags** - Add tag filtering and display to pipeline/list view
-3. **Twilio Integration** - Connect SMS templates and activities to actual Twilio sending
-4. **Bulk Tag Assignment** - Select multiple leads and apply tags in pipeline view
+1. **Test Quotes Flow** - Create a test quote, send it, accept it, convert to job
+2. **Tag Management UI** - Build settings page to manage disposition tags from CRM
+3. **Pipeline View Tags** - Add tag filtering and display to leads list
+4. **Twilio Integration** - Connect SMS to actual sending
 
 ---
 
 **Session End**: 2026-01-14
-**Status**: Lead management features complete, awaiting tag management UI
+**Status**: Quotes successfully moved under Finances with full CRUD

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { Plus, Clock, CheckCircle, XCircle, Send, AlertCircle } from 'lucide-react';
@@ -16,6 +17,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; icon: React.Elem
 };
 
 export default function QuotesPage() {
+  const router = useRouter();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -24,7 +26,11 @@ export default function QuotesPage() {
     fetch('/api/quotes')
       .then(r => r.json())
       .then(data => {
-        setQuotes(data);
+        if (Array.isArray(data)) {
+          setQuotes(data);
+        } else {
+          setQuotes([]);
+        }
         setLoading(false);
       })
       .catch((error) => {
@@ -68,7 +74,7 @@ export default function QuotesPage() {
       <PageHeader
         title="Quotes"
         actions={
-          <Link href="/quotes/new">
+          <Link href="/finances/quotes/new">
             <button className="flex items-center gap-2 px-4 py-2 bg-tidyco-blue text-white rounded-lg hover:bg-blue-700 transition-colors">
               <Plus className="w-4 h-4" />
               New Quote
@@ -139,7 +145,7 @@ export default function QuotesPage() {
                 <tr
                   key={quote.id}
                   className="hover:bg-gray-50 cursor-pointer transition-colors"
-                  onClick={() => window.location.href = `/quotes/${quote.id}`}
+                  onClick={() => router.push(`/finances/quotes/${quote.id}`)}
                 >
                   <td className="p-4">
                     <div className="font-medium text-tidyco-navy">
@@ -183,7 +189,7 @@ export default function QuotesPage() {
             {filteredQuotes.length === 0 && (
               <tr>
                 <td colSpan={6} className="p-8 text-center text-gray-500">
-                  No quotes found
+                  No quotes found. Create your first quote!
                 </td>
               </tr>
             )}

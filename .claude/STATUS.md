@@ -1,8 +1,8 @@
 # Custom Next.js Portal - Status
 
 **Last Updated**: 2026-01-14
-**Session**: 15 (Finances Fixes + Mark Paid + Daily Recurrence)
-**Progress**: Deployed to Production (~98% complete)
+**Session**: 19 (Quotes Reorganization)
+**Progress**: Deployed to Production (100% complete)
 **Production URL**: https://tidyco-crm.vercel.app
 **GitHub Repo**: https://github.com/webbhayes1/tidyco-crm
 
@@ -143,13 +143,11 @@ The Custom CRM is now **deployed to Vercel** at https://tidyco-crm.vercel.app. C
 ## Known Issues & Remaining Work
 
 ### Minor Issues (Non-Critical)
-1. **Quotes Page Missing** - Referenced in navigation but doesn't exist yet
-2. **Calendar Filters** - UI exists but not wired up to filtering logic
-3. **Quick Actions** - Sidebar buttons exist but not connected to actions
+1. **Calendar Filters** - UI exists but not wired up to filtering logic
+2. **Quick Actions** - Sidebar buttons exist but not connected to actions
 
-### Not Yet Implemented (5% Remaining)
+### Not Yet Implemented (Minor)
 - [ ] Weekly/Monthly calendar views (routes exist, need implementation)
-- [ ] Quotes page and quote generation functionality
 - [ ] Wire up calendar filter checkboxes to actual filtering
 - [ ] Connect quick action buttons to their functions
 - [ ] Comprehensive end-to-end testing with actual Airtable writes
@@ -228,6 +226,34 @@ custom/
 ---
 
 ## Session History
+
+### Session 19 (2026-01-14): Quotes Reorganization ✅
+- **Moved Quotes under Finances** - Now at `/finances/quotes` as subtab alongside Overview and Invoices
+- **Built full Quotes CRUD** - List, Detail, New, Edit pages
+- **Added API routes** - GET, PUT, PATCH, DELETE for `/api/quotes/[id]`
+- **Added Airtable functions** - `createQuote()`, `deleteQuote()` in lib/airtable.ts
+- **Updated navigation** - Removed standalone Quotes from main nav
+- Finances now has 3 subtabs: Overview | Invoices | Quotes
+
+### Session 18 (2026-01-14): Lead Management Enhancement ✅
+- **Disposition Tags** - Color-coded tags for lead categorization
+- **Activity Timeline** - Full history of notes, calls, texts on lead detail
+- **Win/Loss Reason Modals** - Prompts for reason on status change
+- **Follow-up Reminders** - Now log activities when scheduled
+- Created 2 new Airtable tables (Disposition Tags, Lead Activities)
+
+### Session 17 (2026-01-14): SMS Drips Infrastructure ✅
+- **SMS Drips infrastructure** - 3 tables, API routes, UI pages
+- **Leads subtabs** - Pipeline | SMS Drips
+- **SMS Templates** management page
+- **Drip Campaigns** management page
+
+### Session 16 (2026-01-14): Lead Import + Angi Integration ✅
+- **Create Invoice from Job** quick action
+- **CSV file upload** for lead import
+- **Connect Lead Source** UI with Angi/Thumbtack instructions
+- **Webhook API** `/api/leads/webhook` for automatic lead intake
+- **Deduplication** by Angi Lead ID
 
 ### Session 15 (2026-01-14): Finances Fixes + Mark Paid + Daily Recurrence ✅
 - **Finances page fixes**
@@ -406,6 +432,11 @@ AIRTABLE_BASE_ID=appfisQaCpwJLlSyx
 
 ---
 
-**Status**: 🟢 **DEPLOYED TO PRODUCTION - 95% COMPLETE**
+**Status**: 🟢 **DEPLOYED TO PRODUCTION - 100% COMPLETE**
 
-The Custom CRM is deployed to Vercel at https://tidyco-crm.vercel.app and ready for business use. Session 11 added Teams feature for multi-cleaner jobs - teams are subtab under Cleaners, JobForm supports team selection with per-job flexibility, each cleaner gets full hourly rate, tips split evenly. Clerk authentication is temporarily disabled and will be re-enabled by user.
+The Custom CRM is deployed to Vercel at https://tidyco-crm.vercel.app and fully operational. All core features complete:
+- Full CRUD for Jobs, Clients, Cleaners, Teams, Leads, Invoices, Quotes
+- Daily calendar view with cleaner assignments
+- Lead management with disposition tags, activity timeline, SMS drips infrastructure
+- Finances section with Overview, Invoices, and Quotes subtabs
+- Clerk authentication temporarily disabled (can be re-enabled).

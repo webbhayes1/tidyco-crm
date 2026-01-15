@@ -9,7 +9,6 @@ import {
   Briefcase,
   Users,
   UserCheck,
-  FileText,
   DollarSign,
   UserPlus
 } from 'lucide-react';
@@ -22,7 +21,6 @@ const navigation = [
   { name: 'Clients', href: '/clients', icon: Users },
   { name: 'Cleaners', href: '/cleaners', icon: UserCheck },
   { name: 'Finances', href: '/finances', icon: DollarSign },
-  { name: 'Quotes', href: '/quotes', icon: FileText },
 ];
 
 export function Navigation() {
