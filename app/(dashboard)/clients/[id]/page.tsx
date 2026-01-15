@@ -2,7 +2,8 @@ import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
 import { DeleteButton } from '@/components/DeleteButton';
-import { getClient, getJobs } from '@/lib/airtable';
+import { PreferredCleanerSection } from '@/components/PreferredCleanerSection';
+import { getClient, getJobs, getCleaners } from '@/lib/airtable';
 import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
 import { ArrowLeft, Edit, Mail, Phone, MapPin, Star, Calendar, Clock, DollarSign } from 'lucide-react';
@@ -25,8 +26,8 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     notFound();
   }
 
-  // Fetch jobs for this client
-  const allJobs = await getJobs();
+  // Fetch jobs and cleaners for this client
+  const [allJobs, cleaners] = await Promise.all([getJobs(), getCleaners()]);
   const clientJobs = allJobs.filter(job =>
     job.fields.Client?.includes(params.id)
   ).sort((a, b) => {
@@ -316,6 +317,18 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
 
         {/* Sidebar */}
         <div className="space-y-6">
+          {/* Preferred Cleaner */}
+          <PreferredCleanerSection
+            clientId={client.id}
+            preferredCleanerId={client.fields['Preferred Cleaner']?.[0]}
+            preferredCleanerName={
+              client.fields['Preferred Cleaner']?.[0]
+                ? cleaners.find(c => c.id === client.fields['Preferred Cleaner']?.[0])?.fields.Name
+                : undefined
+            }
+            cleaners={cleaners}
+          />
+
           {/* Cleaning Schedule */}
           <div className="bg-white shadow sm:rounded-lg">
             <div className="px-4 py-5 sm:p-6">
