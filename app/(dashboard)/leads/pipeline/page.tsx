@@ -551,7 +551,7 @@ function ImportLeadsModal({
 
 // Connect Lead Source Modal
 function ConnectLeadSourceModal({ onClose }: { onClose: () => void }) {
-  const [copied, setCopied] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
 
   // Generate the webhook URL based on current host
@@ -559,72 +559,254 @@ function ConnectLeadSourceModal({ onClose }: { onClose: () => void }) {
     ? `${window.location.origin}/api/leads/webhook`
     : 'https://tidyco-crm.vercel.app/api/leads/webhook';
 
-  const handleCopy = (text: string) => {
+  const handleCopy = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
   };
 
   const leadSources = [
     {
       id: 'angi',
-      name: 'Angi (Angie\'s List)',
+      name: 'Angi / HomeAdvisor',
       logo: '🏠',
-      color: 'bg-blue-500',
+      color: 'bg-red-500',
+      category: 'Lead Marketplaces',
+      integrationMethod: 'email',
+      difficulty: 'Easy',
+      setupTime: '1-2 business days',
+      description: 'Angi (formerly Angie\'s List) and HomeAdvisor are now merged. Integration is set up by emailing their team.',
       instructions: [
-        'Log in to your Angi Pro account',
-        'Go to Settings → Lead Integrations',
-        'Click "Add New Integration"',
-        'Enter the webhook URL below',
-        'Set Method to POST and Content-Type to application/json',
-        'Contact Angi support at crmintegrations@angi.com if needed',
+        'Copy the webhook URL below',
+        'Send an email to crmintegrations@angi.com',
+        'Include: Your business name, Angi account email, phone number, and the webhook URL',
+        'Request that all new leads be sent to this webhook URL',
+        'Wait 1-2 business days for confirmation',
       ],
+      additionalInfo: {
+        contactEmail: 'crmintegrations@angi.com',
+        note: 'Angi does NOT have a self-service integration portal. All webhook setups are handled manually by their CRM integrations team.',
+        docs: 'https://intercom.help/angi/en/articles/10288125-setting-up-api-integration-with-angi',
+      },
+      emailTemplate: `Subject: CRM Webhook Integration Request
+
+Hello Angi CRM Team,
+
+I would like to set up a webhook integration to receive my leads automatically.
+
+Business Name: [YOUR BUSINESS NAME]
+Account Email: [YOUR ANGI ACCOUNT EMAIL]
+Phone: [YOUR PHONE NUMBER]
+
+Webhook URL: ${typeof window !== 'undefined' ? window.location.origin : 'https://tidyco-crm.vercel.app'}/api/leads/webhook
+Method: POST
+Content-Type: application/json
+
+Please configure my account to send all new leads to this webhook.
+
+Thank you!`,
     },
     {
       id: 'thumbtack',
       name: 'Thumbtack',
       logo: '📌',
-      color: 'bg-green-500',
+      color: 'bg-blue-600',
+      category: 'Lead Marketplaces',
+      integrationMethod: 'zapier',
+      difficulty: 'Medium',
+      setupTime: '15-30 minutes',
+      description: 'Thumbtack\'s Partner API requires OAuth credentials. Most pros use Zapier for integration.',
       instructions: [
-        'Log in to your Thumbtack Pro account',
-        'Go to Settings → Integrations',
-        'Look for "Webhook" or "API" settings',
-        'Enter the webhook URL below',
-        'Contact Thumbtack support for integration help',
+        'Go to zapier.com and create a free account',
+        'Create a new Zap with trigger: "Thumbtack → New Lead"',
+        'Connect your Thumbtack Pro account when prompted',
+        'Set action: "Webhooks by Zapier → POST"',
+        'Enter our webhook URL in the URL field',
+        'Map the lead fields (name, email, phone, etc.)',
+        'Test and enable your Zap',
       ],
+      additionalInfo: {
+        zapierLink: 'https://zapier.com/apps/thumbtack/integrations/webhook',
+        note: 'Thumbtack only allows ONE lead integration per account. If you have an existing integration, disconnect it first.',
+        docs: 'https://developers.thumbtack.com/docs/negotiations/implementation',
+      },
     },
     {
-      id: 'homeadvisor',
-      name: 'HomeAdvisor',
-      logo: '🏡',
-      color: 'bg-orange-500',
+      id: 'yelp',
+      name: 'Yelp',
+      logo: '⭐',
+      color: 'bg-red-600',
+      category: 'Lead Marketplaces',
+      integrationMethod: 'zapier',
+      difficulty: 'Medium',
+      setupTime: '15-30 minutes',
+      description: 'Yelp offers a Leads API for advertising partners. Most businesses use the Zapier integration.',
       instructions: [
-        'Log in to your HomeAdvisor Pro account',
-        'Navigate to Lead Settings',
-        'Find API/Webhook integration options',
-        'Enter the webhook URL below',
-        'Contact HomeAdvisor support for setup assistance',
+        'Go to zapier.com and create a free account',
+        'Create a new Zap with trigger: "Yelp → New Lead"',
+        'Connect your Yelp for Business account',
+        'Set action: "Webhooks by Zapier → POST"',
+        'Enter our webhook URL in the URL field',
+        'Map the lead fields appropriately',
+        'Test and enable your Zap',
       ],
+      additionalInfo: {
+        zapierLink: 'https://zapier.com/apps/yelp/integrations',
+        note: 'Yelp\'s native Leads API is available to advertising partners with development resources.',
+        docs: 'https://docs.developer.yelp.com/docs/leads-api-zapier-integration',
+      },
+    },
+    {
+      id: 'facebook',
+      name: 'Facebook Lead Ads',
+      logo: '📘',
+      color: 'bg-blue-700',
+      category: 'Advertising Platforms',
+      integrationMethod: 'zapier',
+      difficulty: 'Medium',
+      setupTime: '15-30 minutes',
+      description: 'Connect Facebook Lead Ads to automatically import leads from your Facebook ad campaigns.',
+      instructions: [
+        'Go to zapier.com and create a free account',
+        'Create a new Zap with trigger: "Facebook Lead Ads → New Lead"',
+        'Connect your Facebook account and select your Page',
+        'Choose the Lead Form to monitor',
+        'Set action: "Webhooks by Zapier → POST"',
+        'Enter our webhook URL and map the fields',
+        'Test with a sample lead and enable',
+      ],
+      additionalInfo: {
+        zapierLink: 'https://zapier.com/apps/facebook-lead-ads/integrations/webhook',
+        note: 'Requires a Facebook Business Page with Lead Ads enabled. Zapier paid plan may be required.',
+        docs: 'https://zapier.com/blog/use-webhooks-with-facebook-lead-ads/',
+      },
+    },
+    {
+      id: 'google',
+      name: 'Google Local Services',
+      logo: '🔍',
+      color: 'bg-green-600',
+      category: 'Advertising Platforms',
+      integrationMethod: 'api',
+      difficulty: 'Advanced',
+      setupTime: '1-2 hours',
+      description: 'Google Local Services Ads can send leads via webhook. Requires Google Ads API access.',
+      instructions: [
+        'You need a Google Ads Manager Account with Local Services campaigns',
+        'Go to Google Ads → Tools & Settings → Lead form extensions',
+        'Select your lead form and click "Webhook integration"',
+        'Enter our webhook URL in the Webhook URL field',
+        'Generate a webhook key for validation',
+        'Save and test with a sample submission',
+      ],
+      additionalInfo: {
+        note: 'For simpler setup, consider using Zapier with "Google Ads → New Lead Form Entry" trigger.',
+        docs: 'https://support.google.com/google-ads/answer/16729613',
+        zapierAlt: 'https://zapier.com/apps/google-ads/integrations/webhook',
+      },
+    },
+    {
+      id: 'nextdoor',
+      name: 'Nextdoor',
+      logo: '🏘️',
+      color: 'bg-green-700',
+      category: 'Lead Marketplaces',
+      integrationMethod: 'zapier',
+      difficulty: 'Medium',
+      setupTime: '15-30 minutes',
+      description: 'Connect your Nextdoor business leads to automatically import neighborhood inquiries.',
+      instructions: [
+        'Go to zapier.com and create a free account',
+        'Create a new Zap with trigger: "Nextdoor → New Lead"',
+        'Connect your Nextdoor Business account',
+        'Set action: "Webhooks by Zapier → POST"',
+        'Enter our webhook URL in the URL field',
+        'Map name, email, phone, and message fields',
+        'Test and enable your Zap',
+      ],
+      additionalInfo: {
+        zapierLink: 'https://zapier.com/apps/nextdoor/integrations/webhook',
+        docs: 'https://developer.nextdoor.com/',
+      },
+    },
+    {
+      id: 'porch',
+      name: 'Porch',
+      logo: '🏗️',
+      color: 'bg-teal-600',
+      category: 'Lead Marketplaces',
+      integrationMethod: 'contact',
+      difficulty: 'Medium',
+      setupTime: '2-5 business days',
+      description: 'Porch offers CRM integrations for home service professionals. Contact their team for setup.',
+      instructions: [
+        'Log in to your Porch Pro account',
+        'Go to Settings or contact Porch support',
+        'Request CRM/webhook integration',
+        'Provide our webhook URL',
+        'Porch will configure the integration on their end',
+      ],
+      additionalInfo: {
+        note: 'Porch has native integrations with some CRMs (like MarketSharp). For custom webhooks, contact their support team.',
+        contactEmail: 'support@porch.com',
+      },
+    },
+    {
+      id: 'email',
+      name: 'Email Forwarding',
+      logo: '📧',
+      color: 'bg-purple-600',
+      category: 'Universal Methods',
+      integrationMethod: 'email-parser',
+      difficulty: 'Medium',
+      setupTime: '20-40 minutes',
+      description: 'Forward lead notification emails from ANY source and automatically parse them into leads.',
+      instructions: [
+        'Go to zapier.com and set up Email Parser by Zapier',
+        'Create a unique parsing email (yourname@robot.zapier.com)',
+        'Forward a sample lead email to train the parser',
+        'Highlight and name fields (name, email, phone, etc.)',
+        'Create a Zap: "Email Parser → New Email" → "Webhook → POST"',
+        'Enter our webhook URL and map the parsed fields',
+        'Set up email forwarding rules in your inbox to auto-forward lead emails',
+      ],
+      additionalInfo: {
+        zapierLink: 'https://zapier.com/apps/email-parser/integrations/webhook',
+        note: 'Works with ANY lead source that sends email notifications! Great for sources without direct integrations.',
+        alternativeTool: 'mailparser.io - More advanced parsing with free tier',
+      },
     },
     {
       id: 'custom',
-      name: 'Custom / Other',
+      name: 'Custom / API',
       logo: '⚙️',
-      color: 'bg-gray-500',
+      color: 'bg-gray-600',
+      category: 'Universal Methods',
+      integrationMethod: 'webhook',
+      difficulty: 'Technical',
+      setupTime: 'Varies',
+      description: 'Direct webhook integration for developers or any service that can send HTTP POST requests.',
       instructions: [
-        'Use the webhook URL below in your lead source',
-        'Send a POST request with JSON body',
-        'Required field: name',
-        'Optional: email, phone, address, city, state, zip, service_type, notes',
+        'Copy the webhook URL below',
+        'Configure your lead source to POST JSON to this URL',
+        'Required field: "name" (string)',
+        'Optional fields: email, phone, address, city, state, zip, service_type, notes, lead_source',
+        'Send a test POST request to verify',
       ],
+      additionalInfo: {
+        method: 'POST',
+        contentType: 'application/json',
+      },
     },
   ];
 
+  // Group sources by category
+  const categories = Array.from(new Set(leadSources.map(s => s.category)));
   const selectedSourceData = leadSources.find(s => s.id === selectedSource);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold">Connect Lead Source</h2>
@@ -635,24 +817,32 @@ function ConnectLeadSourceModal({ onClose }: { onClose: () => void }) {
 
           {!selectedSource ? (
             <>
-              <p className="text-sm text-gray-600 mb-4">
-                Connect your lead sources to automatically import leads into your CRM.
+              <p className="text-sm text-gray-600 mb-6">
+                Connect your lead sources to automatically import leads into your CRM. Select a platform to see setup instructions.
               </p>
 
-              <div className="grid grid-cols-2 gap-3">
-                {leadSources.map((source) => (
-                  <button
-                    key={source.id}
-                    onClick={() => setSelectedSource(source.id)}
-                    className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors text-left"
-                  >
-                    <span className={`w-10 h-10 ${source.color} rounded-lg flex items-center justify-center text-white text-xl mr-3`}>
-                      {source.logo}
-                    </span>
-                    <span className="font-medium text-gray-900">{source.name}</span>
-                  </button>
-                ))}
-              </div>
+              {categories.map((category) => (
+                <div key={category} className="mb-6">
+                  <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">{category}</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {leadSources.filter(s => s.category === category).map((source) => (
+                      <button
+                        key={source.id}
+                        onClick={() => setSelectedSource(source.id)}
+                        className="flex items-center p-3 border border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors text-left"
+                      >
+                        <span className={`w-10 h-10 ${source.color} rounded-lg flex items-center justify-center text-white text-lg mr-3 flex-shrink-0`}>
+                          {source.logo}
+                        </span>
+                        <div className="min-w-0">
+                          <span className="font-medium text-gray-900 text-sm block truncate">{source.name}</span>
+                          <span className="text-xs text-gray-500">{source.difficulty}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </>
           ) : (
             <>
@@ -660,17 +850,31 @@ function ConnectLeadSourceModal({ onClose }: { onClose: () => void }) {
                 onClick={() => setSelectedSource(null)}
                 className="text-sm text-primary-600 hover:text-primary-700 mb-4 flex items-center"
               >
-                ← Back to sources
+                ← Back to all sources
               </button>
 
               <div className="flex items-center mb-4">
-                <span className={`w-10 h-10 ${selectedSourceData?.color} rounded-lg flex items-center justify-center text-white text-xl mr-3`}>
+                <span className={`w-12 h-12 ${selectedSourceData?.color} rounded-lg flex items-center justify-center text-white text-2xl mr-4`}>
                   {selectedSourceData?.logo}
                 </span>
-                <h3 className="text-lg font-semibold">{selectedSourceData?.name}</h3>
+                <div>
+                  <h3 className="text-lg font-semibold">{selectedSourceData?.name}</h3>
+                  <div className="flex items-center gap-3 text-sm text-gray-500">
+                    <span className="flex items-center">
+                      <span className="w-2 h-2 rounded-full bg-green-500 mr-1"></span>
+                      {selectedSourceData?.difficulty}
+                    </span>
+                    <span>•</span>
+                    <span>{selectedSourceData?.setupTime}</span>
+                  </div>
+                </div>
               </div>
 
-              {/* Webhook URL */}
+              <p className="text-sm text-gray-600 mb-6 p-3 bg-gray-50 rounded-lg">
+                {selectedSourceData?.description}
+              </p>
+
+              {/* Webhook URL - Always show */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Your Webhook URL
@@ -683,43 +887,94 @@ function ConnectLeadSourceModal({ onClose }: { onClose: () => void }) {
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md bg-gray-50 text-sm font-mono"
                   />
                   <button
-                    onClick={() => handleCopy(webhookUrl)}
+                    onClick={() => handleCopy(webhookUrl, 'url')}
                     className="px-4 py-2 bg-primary-600 text-white rounded-r-md hover:bg-primary-700 flex items-center"
                   >
-                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    {copiedField === 'url' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Provide this URL to your lead vendor for automatic lead import
-                </p>
               </div>
 
-              {/* API Details */}
-              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                <h4 className="font-medium text-sm mb-2">API Details</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex">
-                    <span className="text-gray-500 w-24">Method:</span>
-                    <span className="font-mono">POST</span>
+              {/* Email Template for Angi */}
+              {selectedSourceData?.emailTemplate && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Email Template (copy and customize)
+                    </label>
+                    <button
+                      onClick={() => handleCopy(selectedSourceData.emailTemplate!, 'email')}
+                      className="text-sm text-primary-600 hover:text-primary-700 flex items-center"
+                    >
+                      {copiedField === 'email' ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
+                      Copy template
+                    </button>
                   </div>
-                  <div className="flex">
-                    <span className="text-gray-500 w-24">Content-Type:</span>
-                    <span className="font-mono">application/json</span>
-                  </div>
+                  <pre className="p-3 bg-gray-900 text-gray-300 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap">
+                    {selectedSourceData.emailTemplate}
+                  </pre>
+                  {selectedSourceData.additionalInfo?.contactEmail && (
+                    <a
+                      href={`mailto:${selectedSourceData.additionalInfo.contactEmail}?subject=CRM%20Webhook%20Integration%20Request`}
+                      className="mt-2 inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
+                    >
+                      <Mail className="h-4 w-4 mr-1" />
+                      Open email to {selectedSourceData.additionalInfo.contactEmail}
+                    </a>
+                  )}
                 </div>
-              </div>
+              )}
 
               {/* Instructions */}
               <div className="mb-6">
-                <h4 className="font-medium text-sm mb-2">Setup Instructions</h4>
-                <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
+                <h4 className="font-medium text-sm mb-3">Setup Instructions</h4>
+                <ol className="space-y-3">
                   {selectedSourceData?.instructions.map((instruction, i) => (
-                    <li key={i}>{instruction}</li>
+                    <li key={i} className="flex text-sm">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-medium mr-3">
+                        {i + 1}
+                      </span>
+                      <span className="text-gray-600 pt-0.5">{instruction}</span>
+                    </li>
                   ))}
                 </ol>
               </div>
 
-              {/* Sample JSON */}
+              {/* Additional Info */}
+              {selectedSourceData?.additionalInfo && (
+                <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <h4 className="font-medium text-sm text-amber-800 mb-2">Important Notes</h4>
+                  <div className="space-y-2 text-sm text-amber-700">
+                    {selectedSourceData.additionalInfo.note && (
+                      <p>{selectedSourceData.additionalInfo.note}</p>
+                    )}
+                    {selectedSourceData.additionalInfo.zapierLink && (
+                      <a
+                        href={selectedSourceData.additionalInfo.zapierLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center text-amber-800 hover:text-amber-900 font-medium"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-1" />
+                        Open Zapier Integration
+                      </a>
+                    )}
+                    {selectedSourceData.additionalInfo.docs && (
+                      <a
+                        href={selectedSourceData.additionalInfo.docs}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center text-amber-800 hover:text-amber-900"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-1" />
+                        Official Documentation
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Sample JSON for Custom */}
               {selectedSource === 'custom' && (
                 <div className="mb-6">
                   <h4 className="font-medium text-sm mb-2">Sample JSON Payload</h4>
@@ -733,9 +988,13 @@ function ConnectLeadSourceModal({ onClose }: { onClose: () => void }) {
   "state": "CA",
   "zip": "90210",
   "service_type": "General Clean",
-  "notes": "2 bedroom apartment"
+  "lead_source": "Website",
+  "notes": "2 bedroom apartment, pet-friendly"
 }`}
                   </pre>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Test with: <code className="bg-gray-100 px-1 rounded">curl -X POST -H &quot;Content-Type: application/json&quot; -d &apos;&#123;&quot;name&quot;:&quot;Test&quot;&#125;&apos; {webhookUrl}</code>
+                  </p>
                 </div>
               )}
 
@@ -744,7 +1003,7 @@ function ConnectLeadSourceModal({ onClose }: { onClose: () => void }) {
                   href="mailto:support@tidyco.com?subject=Lead Integration Help"
                   className="text-sm text-primary-600 hover:text-primary-700 flex items-center"
                 >
-                  <ExternalLink className="h-4 w-4 mr-1" />
+                  <Mail className="h-4 w-4 mr-1" />
                   Need help? Contact support
                 </a>
                 <button
