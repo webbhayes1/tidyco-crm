@@ -630,32 +630,47 @@ function ImportLeadsModal({
           {preview.length > 0 && (
             <div className="mb-4">
               <h3 className="font-medium mb-2">Preview ({preview.length} leads)</h3>
-              <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-md">
+              <div className="max-h-48 overflow-auto border border-gray-200 rounded-md">
                 <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-gray-50 sticky top-0">
                     <tr>
-                      <th className="px-3 py-2 text-left">Name</th>
-                      <th className="px-3 py-2 text-left">Phone</th>
-                      <th className="px-3 py-2 text-left">Source</th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap">Name</th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap">Phone</th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap">Email</th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap">Address</th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap">City</th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap">Service</th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap">Source</th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap">Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {preview.slice(0, 5).map((lead, i) => (
-                      <tr key={i} className="border-t">
-                        <td className="px-3 py-2">{lead.Name}</td>
-                        <td className="px-3 py-2">{lead.Phone || '-'}</td>
-                        <td className="px-3 py-2">{lead['Lead Source'] || '-'}</td>
+                    {preview.slice(0, 10).map((lead, i) => (
+                      <tr key={i} className="border-t hover:bg-gray-50">
+                        <td className="px-3 py-2 whitespace-nowrap">{lead.Name}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">{lead.Phone || '-'}</td>
+                        <td className="px-3 py-2 whitespace-nowrap max-w-[150px] truncate" title={lead.Email}>{lead.Email || '-'}</td>
+                        <td className="px-3 py-2 whitespace-nowrap max-w-[150px] truncate" title={lead.Address}>{lead.Address || '-'}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">{lead.City || '-'}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">{lead['Service Type Interested'] || '-'}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">{lead['Lead Source'] || '-'}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">{lead.Status || 'New'}</td>
                       </tr>
                     ))}
-                    {preview.length > 5 && (
+                    {preview.length > 10 && (
                       <tr className="border-t">
-                        <td colSpan={3} className="px-3 py-2 text-gray-500 text-center">
-                          ... and {preview.length - 5} more
+                        <td colSpan={8} className="px-3 py-2 text-gray-500 text-center">
+                          ... and {preview.length - 10} more leads
                         </td>
                       </tr>
                     )}
                   </tbody>
                 </table>
+              </div>
+              {/* Show what fields were detected */}
+              <div className="mt-2 text-xs text-gray-500">
+                <span className="font-medium">Fields detected: </span>
+                {Object.keys(preview[0] || {}).filter(k => preview[0][k as keyof Lead['fields']]).join(', ')}
               </div>
             </div>
           )}
