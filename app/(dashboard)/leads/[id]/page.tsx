@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
-import { Lead } from '@/types/airtable';
-import { format } from 'date-fns';
+import { Lead, DispositionTag, LeadActivity } from '@/types/airtable';
+import { format, formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -18,7 +18,16 @@ import {
   Briefcase,
   Trash2,
   MessageSquare,
-  PhoneCall
+  PhoneCall,
+  Tag,
+  Plus,
+  X,
+  Clock,
+  FileText,
+  Send,
+  Users,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 
 export default function LeadDetailPage() {
@@ -28,23 +37,57 @@ export default function LeadDetailPage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState<'Won' | 'Lost' | null>(null);
+  const [showTagModal, setShowTagModal] = useState(false);
+
+  // Disposition Tags
+  const [allTags, setAllTags] = useState<DispositionTag[]>([]);
+  const [leadTags, setLeadTags] = useState<DispositionTag[]>([]);
+
+  // Activities
+  const [activities, setActivities] = useState<LeadActivity[]>([]);
+  const [newNote, setNewNote] = useState('');
+  const [addingNote, setAddingNote] = useState(false);
 
   useEffect(() => {
-    async function fetchLead() {
+    async function fetchData() {
       try {
-        const response = await fetch(`/api/leads/${params.id}`);
-        if (!response.ok) throw new Error('Lead not found');
-        const data = await response.json();
-        setLead(data);
+        const [leadRes, tagsRes] = await Promise.all([
+          fetch(`/api/leads/${params.id}`),
+          fetch('/api/leads/disposition-tags?active=true')
+        ]);
+
+        if (!leadRes.ok) throw new Error('Lead not found');
+        const leadData = await leadRes.json();
+        setLead(leadData);
+
+        if (tagsRes.ok) {
+          const tagsData = await tagsRes.json();
+          setAllTags(tagsData);
+
+          // Filter tags that are assigned to this lead
+          if (leadData.fields['Disposition Tags']) {
+            const assignedTags = tagsData.filter((tag: DispositionTag) =>
+              leadData.fields['Disposition Tags'].includes(tag.id)
+            );
+            setLeadTags(assignedTags);
+          }
+        }
+
+        // Fetch activities for this lead
+        const activitiesRes = await fetch(`/api/leads/activities?leadId=${params.id}`);
+        if (activitiesRes.ok) {
+          const activitiesData = await activitiesRes.json();
+          setActivities(activitiesData);
+        }
       } catch (error) {
-        console.error('Failed to fetch lead:', error);
+        console.error('Failed to fetch data:', error);
       } finally {
         setLoading(false);
       }
     }
 
-    fetchLead();
+    fetchData();
   }, [params.id]);
 
   const updateLead = async (fields: Partial<Lead['fields']>) => {
@@ -67,12 +110,80 @@ export default function LeadDetailPage() {
     }
   };
 
-  const logContact = async () => {
+  const handleStatusChange = (status: Lead['fields']['Status']) => {
+    if (status === 'Won' || status === 'Lost') {
+      setShowStatusModal(status);
+    } else {
+      updateLead({ Status: status });
+      // Log status change activity
+      logActivity('Status Change', `Status changed to ${status}`);
+    }
+  };
+
+  const handleStatusWithReason = async (status: 'Won' | 'Lost', reason: string) => {
+    const fields: Partial<Lead['fields']> = { Status: status };
+    if (status === 'Won') {
+      fields['Won Reason'] = reason as Lead['fields']['Won Reason'];
+    } else {
+      fields['Lost Reason'] = reason as Lead['fields']['Lost Reason'];
+    }
+    await updateLead(fields);
+    await logActivity('Status Change', `Status changed to ${status}: ${reason}`);
+    setShowStatusModal(null);
+  };
+
+  const logActivity = async (type: LeadActivity['fields']['Type'], description: string) => {
+    try {
+      const response = await fetch('/api/leads/activities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          Description: description,
+          Type: type,
+          Lead: [lead?.id],
+          'Activity Date': new Date().toISOString(),
+        }),
+      });
+      if (response.ok) {
+        const newActivity = await response.json();
+        setActivities(prev => [newActivity, ...prev]);
+      }
+    } catch (error) {
+      console.error('Failed to log activity:', error);
+    }
+  };
+
+  const logContact = async (type: 'Call' | 'SMS') => {
     const currentCount = lead?.fields['Times Contacted'] || 0;
     await updateLead({
       'Times Contacted': currentCount + 1,
       'Last Contact Date': new Date().toISOString().split('T')[0],
     });
+    await logActivity(type, `Logged ${type.toLowerCase()}`);
+  };
+
+  const addNote = async () => {
+    if (!newNote.trim()) return;
+    setAddingNote(true);
+    await logActivity('Note', newNote);
+    setNewNote('');
+    setAddingNote(false);
+  };
+
+  const toggleTag = async (tag: DispositionTag) => {
+    if (!lead) return;
+    const currentTags = lead.fields['Disposition Tags'] || [];
+    let newTags: string[];
+
+    if (currentTags.includes(tag.id)) {
+      newTags = currentTags.filter(id => id !== tag.id);
+      setLeadTags(prev => prev.filter(t => t.id !== tag.id));
+    } else {
+      newTags = [...currentTags, tag.id];
+      setLeadTags(prev => [...prev, tag]);
+    }
+
+    await updateLead({ 'Disposition Tags': newTags });
   };
 
   const handleDelete = async () => {
@@ -110,6 +221,33 @@ export default function LeadDetailPage() {
     }
   };
 
+  const getTagColor = (color: DispositionTag['fields']['Color']) => {
+    const colors = {
+      'Red': 'bg-red-100 text-red-800 border-red-200',
+      'Orange': 'bg-orange-100 text-orange-800 border-orange-200',
+      'Yellow': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      'Green': 'bg-green-100 text-green-800 border-green-200',
+      'Blue': 'bg-blue-100 text-blue-800 border-blue-200',
+      'Purple': 'bg-purple-100 text-purple-800 border-purple-200',
+      'Pink': 'bg-pink-100 text-pink-800 border-pink-200',
+      'Gray': 'bg-gray-100 text-gray-800 border-gray-200',
+    };
+    return colors[color || 'Gray'];
+  };
+
+  const getActivityIcon = (type: LeadActivity['fields']['Type']) => {
+    switch (type) {
+      case 'Call': return <PhoneCall className="h-4 w-4" />;
+      case 'SMS': return <MessageSquare className="h-4 w-4" />;
+      case 'Email': return <Mail className="h-4 w-4" />;
+      case 'Meeting': return <Users className="h-4 w-4" />;
+      case 'Quote Sent': return <Send className="h-4 w-4" />;
+      case 'Status Change': return <CheckCircle className="h-4 w-4" />;
+      case 'Follow-up': return <Calendar className="h-4 w-4" />;
+      default: return <FileText className="h-4 w-4" />;
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -140,14 +278,36 @@ export default function LeadDetailPage() {
         />
       </div>
 
-      {/* Status Badges */}
-      <div className="flex items-center gap-2">
+      {/* Status & Tags Row */}
+      <div className="flex flex-wrap items-center gap-2">
         <StatusBadge status={lead.fields.Status || 'New'} />
         {lead.fields['Lead Source'] && (
           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getSourceBadgeColor(lead.fields['Lead Source'])}`}>
             {lead.fields['Lead Source']}
           </span>
         )}
+        {leadTags.map(tag => (
+          <span
+            key={tag.id}
+            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${getTagColor(tag.fields.Color)}`}
+          >
+            <Tag className="h-3 w-3 mr-1" />
+            {tag.fields.Name}
+            <button
+              onClick={() => toggleTag(tag)}
+              className="ml-1 hover:opacity-70"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+        <button
+          onClick={() => setShowTagModal(true)}
+          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200"
+        >
+          <Plus className="h-3 w-3 mr-1" />
+          Add Tag
+        </button>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -229,59 +389,102 @@ export default function LeadDetailPage() {
             </div>
           </div>
 
-          {/* Activity */}
+          {/* Activity Timeline */}
           <div className="bg-white shadow sm:rounded-lg">
             <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Activity</h3>
-              <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Times Contacted</dt>
-                  <dd className="mt-1 text-2xl font-semibold text-gray-900">
-                    {lead.fields['Times Contacted'] || 0}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Last Contact</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {lead.fields['Last Contact Date']
-                      ? format(new Date(lead.fields['Last Contact Date']), 'MMM d, yyyy')
-                      : 'Never'}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Lead Score</dt>
-                  <dd className="mt-1 text-2xl font-semibold text-gray-900">
-                    {lead.fields['Lead Score'] ?? '-'}
-                  </dd>
-                </div>
-              </dl>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Activity Timeline</h3>
 
-              <div className="mt-4 flex gap-2">
-                <button
-                  onClick={logContact}
-                  disabled={updating}
-                  className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  <PhoneCall className="mr-2 h-4 w-4" />
-                  Log Call
-                </button>
-                <button
-                  onClick={logContact}
-                  disabled={updating}
-                  className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  <MessageSquare className="mr-2 h-4 w-4" />
-                  Log Text
-                </button>
+              {/* Add Note Form */}
+              <div className="mb-6">
+                <div className="flex gap-2">
+                  <textarea
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    placeholder="Add a note..."
+                    rows={2}
+                    className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm"
+                  />
+                  <button
+                    onClick={addNote}
+                    disabled={addingNote || !newNote.trim()}
+                    className="self-end px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-500 disabled:opacity-50 text-sm font-medium"
+                  >
+                    {addingNote ? 'Adding...' : 'Add Note'}
+                  </button>
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={() => logContact('Call')}
+                    disabled={updating}
+                    className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  >
+                    <PhoneCall className="mr-1.5 h-4 w-4" />
+                    Log Call
+                  </button>
+                  <button
+                    onClick={() => logContact('SMS')}
+                    disabled={updating}
+                    className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  >
+                    <MessageSquare className="mr-1.5 h-4 w-4" />
+                    Log Text
+                  </button>
+                </div>
+              </div>
+
+              {/* Activity List */}
+              <div className="flow-root">
+                {activities.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-4">No activity yet</p>
+                ) : (
+                  <ul className="-mb-8">
+                    {activities.map((activity, idx) => (
+                      <li key={activity.id}>
+                        <div className="relative pb-8">
+                          {idx !== activities.length - 1 && (
+                            <span
+                              className="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200"
+                              aria-hidden="true"
+                            />
+                          )}
+                          <div className="relative flex space-x-3">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 ring-8 ring-white">
+                              {getActivityIcon(activity.fields.Type)}
+                            </div>
+                            <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
+                              <div>
+                                <p className="text-sm text-gray-900">
+                                  {activity.fields.Description}
+                                </p>
+                                {activity.fields['Created By'] && (
+                                  <p className="text-xs text-gray-500">
+                                    by {activity.fields['Created By']}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="whitespace-nowrap text-right text-xs text-gray-500">
+                                {activity.fields['Activity Date'] && (
+                                  <time dateTime={activity.fields['Activity Date']}>
+                                    {formatDistanceToNow(new Date(activity.fields['Activity Date']), { addSuffix: true })}
+                                  </time>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Notes */}
+          {/* Notes (legacy, from Notes field) */}
           {lead.fields.Notes && (
             <div className="bg-white shadow sm:rounded-lg">
               <div className="px-4 py-5 sm:p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Notes</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Notes (from import)</h3>
                 <p className="text-sm text-gray-900 whitespace-pre-wrap">{lead.fields.Notes}</p>
               </div>
             </div>
@@ -321,7 +524,7 @@ export default function LeadDetailPage() {
                 {(['New', 'Contacted', 'Qualified', 'Quote Sent', 'Won', 'Lost'] as const).map((status) => (
                   <button
                     key={status}
-                    onClick={() => updateLead({ Status: status })}
+                    onClick={() => handleStatusChange(status)}
                     disabled={updating || lead.fields.Status === status}
                     className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
                       lead.fields.Status === status
@@ -362,10 +565,11 @@ export default function LeadDetailPage() {
                     {[1, 3, 7].map((days) => (
                       <button
                         key={days}
-                        onClick={() => {
+                        onClick={async () => {
                           const date = new Date();
                           date.setDate(date.getDate() + days);
-                          updateLead({ 'Next Follow-Up Date': date.toISOString().split('T')[0] });
+                          await updateLead({ 'Next Follow-Up Date': date.toISOString().split('T')[0] });
+                          await logActivity('Follow-up', `Follow-up scheduled for ${format(date, 'MMM d')}`);
                         }}
                         disabled={updating}
                         className="px-2 py-1 text-xs rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700"
@@ -376,6 +580,31 @@ export default function LeadDetailPage() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Contact Stats */}
+          <div className="bg-white shadow sm:rounded-lg">
+            <div className="px-4 py-5 sm:p-6">
+              <h3 className="text-base font-medium text-gray-900 mb-4">Contact Stats</h3>
+              <dl className="space-y-3">
+                <div className="flex justify-between">
+                  <dt className="text-sm text-gray-500">Times Contacted</dt>
+                  <dd className="text-sm font-medium text-gray-900">{lead.fields['Times Contacted'] || 0}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-sm text-gray-500">Last Contact</dt>
+                  <dd className="text-sm font-medium text-gray-900">
+                    {lead.fields['Last Contact Date']
+                      ? format(new Date(lead.fields['Last Contact Date']), 'MMM d')
+                      : 'Never'}
+                  </dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-sm text-gray-500">Lead Score</dt>
+                  <dd className="text-sm font-medium text-gray-900">{lead.fields['Lead Score'] ?? '-'}</dd>
+                </div>
+              </dl>
             </div>
           </div>
 
@@ -406,24 +635,28 @@ export default function LeadDetailPage() {
             </div>
           </div>
 
-          {/* Lost Reason (if Lost) */}
-          {lead.fields.Status === 'Lost' && (
-            <div className="bg-white shadow sm:rounded-lg">
+          {/* Won Reason (if Won) */}
+          {lead.fields.Status === 'Won' && lead.fields['Won Reason'] && (
+            <div className="bg-green-50 shadow sm:rounded-lg">
               <div className="px-4 py-5 sm:p-6">
-                <h3 className="text-base font-medium text-gray-900 mb-4">Lost Reason</h3>
-                <select
-                  value={lead.fields['Lost Reason'] || ''}
-                  onChange={(e) => updateLead({ 'Lost Reason': e.target.value as Lead['fields']['Lost Reason'] })}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm"
-                >
-                  <option value="">Select reason...</option>
-                  <option value="Price too high">Price too high</option>
-                  <option value="Chose competitor">Chose competitor</option>
-                  <option value="No response">No response</option>
-                  <option value="Not ready">Not ready</option>
-                  <option value="Outside service area">Outside service area</option>
-                  <option value="Other">Other</option>
-                </select>
+                <h3 className="text-base font-medium text-green-900 mb-2 flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5" />
+                  Won Reason
+                </h3>
+                <p className="text-sm text-green-700">{lead.fields['Won Reason']}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Lost Reason (if Lost) */}
+          {lead.fields.Status === 'Lost' && lead.fields['Lost Reason'] && (
+            <div className="bg-red-50 shadow sm:rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <h3 className="text-base font-medium text-red-900 mb-2 flex items-center gap-2">
+                  <XCircle className="h-5 w-5" />
+                  Lost Reason
+                </h3>
+                <p className="text-sm text-red-700">{lead.fields['Lost Reason']}</p>
               </div>
             </div>
           )}
@@ -438,6 +671,26 @@ export default function LeadDetailPage() {
           onConverted={(clientId) => {
             router.push(`/clients/${clientId}`);
           }}
+        />
+      )}
+
+      {/* Status Change Modal (Won/Lost Reason) */}
+      {showStatusModal && (
+        <StatusReasonModal
+          status={showStatusModal}
+          onClose={() => setShowStatusModal(null)}
+          onConfirm={(reason) => handleStatusWithReason(showStatusModal, reason)}
+        />
+      )}
+
+      {/* Tag Selection Modal */}
+      {showTagModal && (
+        <TagSelectionModal
+          allTags={allTags}
+          selectedTagIds={lead.fields['Disposition Tags'] || []}
+          onToggle={toggleTag}
+          onClose={() => setShowTagModal(false)}
+          getTagColor={getTagColor}
         />
       )}
     </div>
@@ -518,6 +771,174 @@ function ConvertToClientModal({
               className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-500 disabled:opacity-50"
             >
               {converting ? 'Converting...' : 'Convert to Client'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Status Reason Modal (for Won/Lost)
+function StatusReasonModal({
+  status,
+  onClose,
+  onConfirm,
+}: {
+  status: 'Won' | 'Lost';
+  onClose: () => void;
+  onConfirm: (reason: string) => void;
+}) {
+  const [reason, setReason] = useState('');
+
+  const wonReasons = [
+    'Good Price',
+    'Quality Service',
+    'Fast Response',
+    'Good Reviews',
+    'Referral Trust',
+    'Availability',
+    'Other',
+  ];
+
+  const lostReasons = [
+    'Price too high',
+    'Chose competitor',
+    'No response',
+    'Not ready',
+    'Outside service area',
+    'Other',
+  ];
+
+  const reasons = status === 'Won' ? wonReasons : lostReasons;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div className="p-6">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            {status === 'Won' ? (
+              <>
+                <CheckCircle className="h-6 w-6 text-green-600" />
+                Mark as Won
+              </>
+            ) : (
+              <>
+                <XCircle className="h-6 w-6 text-red-600" />
+                Mark as Lost
+              </>
+            )}
+          </h2>
+          <p className="text-gray-600 mb-4">
+            {status === 'Won'
+              ? 'Great! Why did this lead convert?'
+              : 'What was the reason for losing this lead?'}
+          </p>
+
+          <div className="space-y-2 mb-6">
+            {reasons.map((r) => (
+              <button
+                key={r}
+                onClick={() => setReason(r)}
+                className={`w-full text-left px-4 py-2 rounded-md border transition-colors ${
+                  reason === r
+                    ? status === 'Won'
+                      ? 'border-green-500 bg-green-50 text-green-700'
+                      : 'border-red-500 bg-red-50 text-red-700'
+                    : 'border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => reason && onConfirm(reason)}
+              disabled={!reason}
+              className={`px-4 py-2 text-white rounded-md disabled:opacity-50 ${
+                status === 'Won'
+                  ? 'bg-green-600 hover:bg-green-500'
+                  : 'bg-red-600 hover:bg-red-500'
+              }`}
+            >
+              Confirm
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Tag Selection Modal
+function TagSelectionModal({
+  allTags,
+  selectedTagIds,
+  onToggle,
+  onClose,
+  getTagColor,
+}: {
+  allTags: DispositionTag[];
+  selectedTagIds: string[];
+  onToggle: (tag: DispositionTag) => void;
+  onClose: () => void;
+  getTagColor: (color: DispositionTag['fields']['Color']) => string;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div className="p-6">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <Tag className="h-5 w-5" />
+            Manage Tags
+          </h2>
+
+          {allTags.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">
+              No tags available. Create tags in Settings.
+            </p>
+          ) : (
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {allTags.map((tag) => {
+                const isSelected = selectedTagIds.includes(tag.id);
+                return (
+                  <button
+                    key={tag.id}
+                    onClick={() => onToggle(tag)}
+                    className={`w-full text-left px-4 py-3 rounded-md border transition-colors flex items-center justify-between ${
+                      isSelected
+                        ? `${getTagColor(tag.fields.Color)} border-current`
+                        : 'border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Tag className="h-4 w-4" />
+                      <span className="font-medium">{tag.fields.Name}</span>
+                      {tag.fields.Description && (
+                        <span className="text-sm text-gray-500">- {tag.fields.Description}</span>
+                      )}
+                    </div>
+                    {isSelected && <CheckCircle className="h-5 w-5" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="mt-6 flex justify-end">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-500"
+            >
+              Done
             </button>
           </div>
         </div>

@@ -333,10 +333,34 @@ export interface Lead {
     'Next Follow-Up Date'?: string;
     'Notes'?: string;
     'Lost Reason'?: 'Price too high' | 'Chose competitor' | 'No response' | 'Not ready' | 'Outside service area' | 'Other';
+    'Won Reason'?: 'Good Price' | 'Quality Service' | 'Fast Response' | 'Good Reviews' | 'Referral Trust' | 'Availability' | 'Other';
+    'Disposition Tags'?: string[]; // Disposition Tag record IDs
+    'Activities'?: string[]; // Lead Activity record IDs
     'Converted Client'?: string[]; // Client record ID when converted
     'Original Client'?: string[]; // Original client if churned re-entered as lead
     'Created Date'?: string;
     'Last Modified'?: string;
+  };
+}
+
+export interface DispositionTag {
+  id: string;
+  fields: {
+    'Name': string;
+    'Color'?: 'Red' | 'Orange' | 'Yellow' | 'Green' | 'Blue' | 'Purple' | 'Pink' | 'Gray';
+    'Description'?: string;
+    'Active'?: boolean;
+  };
+}
+
+export interface LeadActivity {
+  id: string;
+  fields: {
+    'Description': string;
+    'Type'?: 'Note' | 'Call' | 'Email' | 'SMS' | 'Meeting' | 'Quote Sent' | 'Status Change' | 'Follow-up';
+    'Created By'?: string;
+    'Activity Date'?: string;
+    'Lead'?: string[]; // Lead record ID
   };
 }
 

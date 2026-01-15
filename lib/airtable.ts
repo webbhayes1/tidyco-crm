@@ -16,6 +16,8 @@ import {
   SMSTemplate,
   DripCampaign,
   CampaignEnrollment,
+  DispositionTag,
+  LeadActivity,
 } from '@/types/airtable';
 
 // Initialize Airtable
@@ -43,6 +45,8 @@ const TABLES = {
   SMS_TEMPLATES: 'SMS Templates',
   DRIP_CAMPAIGNS: 'Drip Campaigns',
   CAMPAIGN_ENROLLMENTS: 'Campaign Enrollments',
+  DISPOSITION_TAGS: 'Disposition Tags',
+  LEAD_ACTIVITIES: 'Lead Activities',
 } as const;
 
 // Helper function to convert Airtable record to our type
@@ -755,4 +759,123 @@ export async function getDashboardMetrics() {
     activeCleanersCount: activeCleaners.length,
     avgQualityScore: Math.round(avgQualityScore),
   };
+}
+
+// ===== DISPOSITION TAGS =====
+export async function getDispositionTags(options?: {
+  view?: string;
+  filterByFormula?: string;
+}): Promise<DispositionTag[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const selectOptions: any = {
+    view: options?.view || 'Grid view',
+  };
+
+  if (options?.filterByFormula) {
+    selectOptions.filterByFormula = options.filterByFormula;
+  }
+
+  const records = await base(TABLES.DISPOSITION_TAGS).select(selectOptions).all();
+  return records.map(convertRecord<DispositionTag>);
+}
+
+export async function getDispositionTag(id: string): Promise<DispositionTag | null> {
+  try {
+    const record = await base(TABLES.DISPOSITION_TAGS).find(id);
+    return convertRecord<DispositionTag>(record);
+  } catch (error) {
+    console.error('Error fetching disposition tag:', error);
+    return null;
+  }
+}
+
+export async function createDispositionTag(fields: DispositionTag['fields']): Promise<DispositionTag> {
+  const record = await base(TABLES.DISPOSITION_TAGS).create(fields as unknown as FieldSet);
+  return convertRecord<DispositionTag>(record);
+}
+
+export async function updateDispositionTag(id: string, fields: Partial<DispositionTag['fields']>): Promise<DispositionTag> {
+  const record = await base(TABLES.DISPOSITION_TAGS).update(id, fields as unknown as FieldSet);
+  return convertRecord<DispositionTag>(record);
+}
+
+export async function deleteDispositionTag(id: string): Promise<void> {
+  await base(TABLES.DISPOSITION_TAGS).destroy(id);
+}
+
+// Get active disposition tags only
+export async function getActiveDispositionTags(): Promise<DispositionTag[]> {
+  const formula = `{Active} = TRUE()`;
+  return getDispositionTags({ filterByFormula: formula });
+}
+
+// ===== LEAD ACTIVITIES =====
+export async function getLeadActivities(options?: {
+  view?: string;
+  filterByFormula?: string;
+  maxRecords?: number;
+}): Promise<LeadActivity[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const selectOptions: any = {
+    view: options?.view || 'Grid view',
+  };
+
+  if (options?.filterByFormula) {
+    selectOptions.filterByFormula = options.filterByFormula;
+  }
+  if (options?.maxRecords !== undefined) {
+    selectOptions.maxRecords = options.maxRecords;
+  }
+
+  const records = await base(TABLES.LEAD_ACTIVITIES).select(selectOptions).all();
+  return records.map(convertRecord<LeadActivity>);
+}
+
+export async function getLeadActivity(id: string): Promise<LeadActivity | null> {
+  try {
+    const record = await base(TABLES.LEAD_ACTIVITIES).find(id);
+    return convertRecord<LeadActivity>(record);
+  } catch (error) {
+    console.error('Error fetching lead activity:', error);
+    return null;
+  }
+}
+
+export async function createLeadActivity(fields: LeadActivity['fields']): Promise<LeadActivity> {
+  const record = await base(TABLES.LEAD_ACTIVITIES).create(fields as unknown as FieldSet);
+  return convertRecord<LeadActivity>(record);
+}
+
+export async function updateLeadActivity(id: string, fields: Partial<LeadActivity['fields']>): Promise<LeadActivity> {
+  const record = await base(TABLES.LEAD_ACTIVITIES).update(id, fields as unknown as FieldSet);
+  return convertRecord<LeadActivity>(record);
+}
+
+export async function deleteLeadActivity(id: string): Promise<void> {
+  await base(TABLES.LEAD_ACTIVITIES).destroy(id);
+}
+
+// Get activities for a specific lead (sorted by date descending)
+export async function getActivitiesForLead(leadId: string): Promise<LeadActivity[]> {
+  const formula = `FIND("${leadId}", ARRAYJOIN({Lead}))`;
+  const activities = await getLeadActivities({ filterByFormula: formula });
+  // Sort by Activity Date descending (most recent first)
+  return activities.sort((a, b) => {
+    const dateA = a.fields['Activity Date'] || '';
+    const dateB = b.fields['Activity Date'] || '';
+    return dateB.localeCompare(dateA);
+  });
+}
+
+// Get recent activities across all leads
+export async function getRecentLeadActivities(limit: number = 20): Promise<LeadActivity[]> {
+  const activities = await getLeadActivities({ maxRecords: limit * 2 }); // Fetch extra to allow sorting
+  // Sort by Activity Date descending and limit
+  return activities
+    .sort((a, b) => {
+      const dateA = a.fields['Activity Date'] || '';
+      const dateB = b.fields['Activity Date'] || '';
+      return dateB.localeCompare(dateA);
+    })
+    .slice(0, limit);
 }

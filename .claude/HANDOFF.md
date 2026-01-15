@@ -1,96 +1,85 @@
 # Custom CRM Session Handoff
 
 **Date**: 2026-01-14
-**Session**: 17 (Leads Enhancement: SMS Drips & Subtabs)
+**Session**: 18 (Lead Management Enhancement)
 **Implementation**: Custom (Next.js)
-**Focus Area**: Leads section subtabs, SMS drip campaign infrastructure
+**Focus Area**: Disposition Tags, Activity Timeline, Win/Loss Reasons
 
 ---
 
 ## Session Summary
 
-Enhanced the Leads section with subtabs (Pipeline, SMS Drips) and built complete SMS drip campaign infrastructure including Airtable tables, TypeScript interfaces, API routes, and full UI for template management and campaigns.
+Enhanced the lead detail page with four major features: Disposition Tags for categorizing leads, Activity Timeline for tracking all interactions and notes, Win/Loss Reason modals for status changes, and improved Follow-up Reminders with activity logging.
 
 ---
 
 ## What Was Accomplished
 
-### 1. Architecture Decision Document
+### 1. Airtable Tables Created
 
-**Created:** `.claude/decisions/009-sms-drip-architecture.md`
-- Documents SMS storage strategy (Twilio API for history, avoids Airtable limits)
-- Template storage in Airtable (editable from UI)
-- SMS sending via n8n webhooks (enables AI personalization)
-- Resale model with Twilio subaccounts per customer
+**Disposition Tags** (`tblRZ7ujey1NXlSVO`)
+- Fields: Name, Color (8 color options), Description, Active
+- Purpose: Custom tags for categorizing leads (e.g., "Hot Lead", "Left Voicemail")
 
-### 2. Airtable Tables Created
+**Lead Activities** (`tblYCLGHCfQcPm9XN`)
+- Fields: Description, Type (Note, Call, Email, SMS, Meeting, Quote Sent, Status Change, Follow-up), Created By, Activity Date, Lead (linked)
+- Purpose: Timeline of all interactions with a lead
 
-**SMS Templates** (`tblmDWUAQ9o1uWl0g`)
-- Fields: Name, Body, Category, Active, Use Count, Last Used, Created By, Notes
-- Imported 14 templates from spec file
+### 2. Leads Table Fields Added
 
-**Drip Campaigns** (`tbldWJM3qsKhSqwrl`)
-- Fields: Name, Description, Trigger Type, Trigger Conditions, Status, Sequence, Lead Count, Conversion Rate, Notes
+- `Disposition Tags` (linked to Disposition Tags table) - `fldigri7rJEPD4DRq`
+- `Won Reason` (single select: Good Price, Quality Service, Fast Response, Good Reviews, Referral Trust, Availability, Other) - `fldLcHLgcLz3w94Lx`
+- `Activities` (inverse link from Lead Activities) - `fldhw3Hw3Ie3AlQm2`
 
-**Campaign Enrollments** (`tbl11Yt1cb49iAvuF`)
-- Fields: Enrollment Name, Lead (linked), Campaign (linked), Status, Current Step, Enrolled/Last/Next/Completed Dates, Cancel Reason
+**Note**: Lost Reason and Next Follow-Up Date fields already existed in the Leads table.
 
-### 3. TypeScript Interfaces
+### 3. TypeScript Interfaces Added
 
-**Added to `types/airtable.ts`:**
-- `SMSTemplate` - Template with body, category, variables
-- `DripCampaign` - Campaign with trigger type, sequence JSON
-- `CampaignEnrollment` - Lead enrollment with step tracking
-- `TwilioMessage` - Message history from Twilio API
+**In `types/airtable.ts`:**
+- `DispositionTag` - Tag with name, color, description, active status
+- `LeadActivity` - Activity with description, type, created by, date, lead link
+- Updated `Lead` interface with Disposition Tags, Won Reason, Activities fields
 
-### 4. Airtable CRUD Functions
+### 4. Airtable CRUD Functions Added
 
-**Added to `lib/airtable.ts`:**
-- SMS Templates: CRUD + getActiveSMSTemplates, getSMSTemplatesByCategory
-- Drip Campaigns: CRUD + getActiveDripCampaigns
-- Campaign Enrollments: CRUD + getActiveEnrollments, getEnrollmentsForLead, getScheduledEnrollments
+**In `lib/airtable.ts`:**
+- Disposition Tags: CRUD + getActiveDispositionTags
+- Lead Activities: CRUD + getActivitiesForLead, getRecentLeadActivities
 
-### 5. Leads Subtab Layout
-
-**Created:** `app/(dashboard)/leads/layout.tsx`
-- Two tabs: Pipeline (Kanban icon), SMS Drips (MessageSquare icon)
-- Follows finances layout pattern
-- Hides tabs on detail pages ([id], new, edit)
-
-**Modified:** `app/(dashboard)/leads/page.tsx`
-- Now redirects to `/leads/pipeline`
-
-**Created:** `app/(dashboard)/leads/pipeline/page.tsx`
-- Contains original leads page content
-
-### 6. SMS Drips Pages
-
-**Main Dashboard:** `/leads/sms-drips/page.tsx`
-- Stats cards: Active Templates, Active Campaigns, Active Enrollments
-- Quick Send card with lead/template selection (sends via n8n)
-- Upcoming Messages card showing scheduled drips
-- Recent Templates grid
-
-**Templates Page:** `/leads/sms-drips/templates/page.tsx`
-- Category filter (All, Lead Nurture, Booking, Payment, Re-engagement, Custom)
-- Template cards with edit/duplicate/delete actions
-- Create/Edit modal with variable insertion buttons
-- Live preview with sample data
-
-**Campaigns Page:** `/leads/sms-drips/campaigns/page.tsx`
-- Campaign list with status badges
-- Trigger type, lead count, conversion rate display
-- Pause/Activate/Delete actions
-
-### 7. API Routes Created
+### 5. API Routes Created
 
 | Route | Methods | Purpose |
 |-------|---------|---------|
-| `/api/sms/templates` | GET, POST | List and create templates |
-| `/api/sms/templates/[id]` | GET, PUT, DELETE | Single template CRUD |
-| `/api/sms/campaigns` | GET, POST | List and create campaigns |
-| `/api/sms/campaigns/[id]` | GET, PUT, DELETE | Single campaign CRUD |
-| `/api/sms/enrollments` | GET, POST | List and create enrollments |
+| `/api/leads/disposition-tags` | GET, POST | List and create tags |
+| `/api/leads/disposition-tags/[id]` | GET, PUT, DELETE | Single tag CRUD |
+| `/api/leads/activities` | GET, POST | List activities (supports ?leadId= and ?recent=true) |
+| `/api/leads/activities/[id]` | GET, PUT, DELETE | Single activity CRUD |
+
+### 6. Lead Detail Page Enhancements
+
+**Disposition Tags:**
+- Tags display in header row next to status badge
+- Color-coded pills with X to remove
+- "Add Tag" button opens modal to select/toggle tags
+- Tags modal shows all active tags with checkmarks for selected
+
+**Activity Timeline:**
+- Full timeline view with icons for each activity type
+- Add note textarea with "Add Note" button
+- Quick "Log Call" and "Log Text" buttons
+- Activities sorted by date (most recent first)
+- Shows relative time ("2 hours ago")
+
+**Win/Loss Reason Modal:**
+- When clicking "Won" or "Lost" status, modal appears
+- Presents reason options as buttons to select
+- Logs activity with status change reason
+- Displays reason in colored card on sidebar (green for Won, red for Lost)
+
+**Follow-up Improvements:**
+- Setting a follow-up now logs an activity
+- +1d, +3d, +7d quick buttons still work
+- Activity shows "Follow-up scheduled for [date]"
 
 ---
 
@@ -98,115 +87,95 @@ Enhanced the Leads section with subtabs (Pipeline, SMS Drips) and built complete
 
 | File | Description |
 |------|-------------|
-| `.claude/decisions/009-sms-drip-architecture.md` | Architecture decision document |
-| `app/(dashboard)/leads/layout.tsx` | Subtab navigation layout |
-| `app/(dashboard)/leads/pipeline/page.tsx` | Pipeline view (moved from leads/page) |
-| `app/(dashboard)/leads/sms-drips/page.tsx` | SMS Drips main dashboard |
-| `app/(dashboard)/leads/sms-drips/templates/page.tsx` | Template management UI |
-| `app/(dashboard)/leads/sms-drips/campaigns/page.tsx` | Campaign management UI |
-| `app/api/sms/templates/route.ts` | Templates API |
-| `app/api/sms/templates/[id]/route.ts` | Single template API |
-| `app/api/sms/campaigns/route.ts` | Campaigns API |
-| `app/api/sms/campaigns/[id]/route.ts` | Single campaign API |
-| `app/api/sms/enrollments/route.ts` | Enrollments API |
+| `app/api/leads/disposition-tags/route.ts` | Tags list/create API |
+| `app/api/leads/disposition-tags/[id]/route.ts` | Single tag CRUD API |
+| `app/api/leads/activities/route.ts` | Activities list/create API |
+| `app/api/leads/activities/[id]/route.ts` | Single activity CRUD API |
 
 ## Files Modified
 
 | File | Changes |
 |------|---------|
-| `.claude/decisions/INDEX.md` | Added 009 reference |
-| `.claude/decisions/airtable-changelog.md` | Logged 3 new tables |
-| `types/airtable.ts` | Added 4 new interfaces |
-| `lib/airtable.ts` | Added CRUD functions for 3 tables |
-| `app/(dashboard)/leads/page.tsx` | Changed to redirect |
+| `types/airtable.ts` | Added DispositionTag, LeadActivity interfaces; updated Lead |
+| `lib/airtable.ts` | Added CRUD functions for 2 new tables |
+| `app/(dashboard)/leads/[id]/page.tsx` | Complete rewrite with tags, timeline, modals |
+| `.claude/decisions/airtable-changelog.md` | Logged 2 new tables and 2 new fields |
 
 ---
 
 ## Build Status
 
-✅ Build completed successfully (45 pages generated)
+✅ Build completed successfully (47 pages generated)
 
 ```
-├ ○ /leads                               156 B          87.3 kB
-├ ○ /leads/pipeline                      6.44 kB         107 kB
-├ ○ /leads/sms-drips                     3.28 kB         104 kB
-├ ○ /leads/sms-drips/campaigns           3.45 kB        97.4 kB
-├ ○ /leads/sms-drips/templates           4.5 kB         98.4 kB
+├ ƒ /leads/[id]                          8.34 kB         109 kB
+├ ƒ /api/leads/activities                0 B                0 B
+├ ƒ /api/leads/activities/[id]           0 B                0 B
+├ ƒ /api/leads/disposition-tags          0 B                0 B
+├ ƒ /api/leads/disposition-tags/[id]     0 B                0 B
 ```
+
+---
+
+## Key Table/Field IDs (New)
+
+| Entity | ID |
+|--------|-----|
+| Disposition Tags table | `tblRZ7ujey1NXlSVO` |
+| Lead Activities table | `tblYCLGHCfQcPm9XN` |
+| Lead → Disposition Tags field | `fldigri7rJEPD4DRq` |
+| Lead → Won Reason field | `fldLcHLgcLz3w94Lx` |
+| Lead → Activities field (inverse) | `fldhw3Hw3Ie3AlQm2` |
+| Lead Activities → Lead field | `fldprkBWEQUw1PO3k` |
 
 ---
 
 ## Still Needed (Not Implemented)
 
-### Twilio Integration
-- [ ] Add Twilio credentials to `.env.local`
-- [ ] Create `lib/twilio.ts` for message history
-- [ ] Create `/api/sms/history/[leadId]/route.ts`
-- [ ] Build `MessageHistory.tsx` component
+### Tag Management UI
+- [ ] Settings page to create/edit/delete disposition tags
+- [ ] Currently tags must be created directly in Airtable
 
-### n8n Webhook Integration
-- [ ] Create `lib/n8n-webhooks.ts`
-- [ ] Connect Quick Send to n8n workflow
-- [ ] Build n8n drip processor workflow
+### Pipeline View Tag Filter
+- [ ] Filter leads by disposition tag in pipeline view
+- [ ] Tag column or badges in pipeline list view
 
-### Lead Detail SMS Section
-- [ ] Add SMS tab/section to lead detail page
-- [ ] Show message history for specific lead
-- [ ] Allow sending from lead detail
+### Activity Types Extensions
+- [ ] Email activity with integration
+- [ ] Meeting scheduling with calendar integration
 
 ---
 
-## Environment Variables Required
+## Usage Notes
 
-```bash
-# Add to .env.local when ready for Twilio
-TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-TWILIO_PHONE_NUMBER=+13105551234
+### Creating Disposition Tags
 
-# n8n webhook URL
-N8N_WEBHOOK_URL=http://localhost:5678
-```
+Currently, tags need to be created in Airtable directly:
+1. Go to Disposition Tags table
+2. Add new record with Name, Color, Description
+3. Set Active = true
+4. Tags will appear in the lead detail modal
+
+### Activity Types
+
+| Type | When Used |
+|------|-----------|
+| Note | Manual note added by user |
+| Call | "Log Call" button clicked |
+| SMS | "Log Text" button clicked |
+| Status Change | Status changed (auto-logged) |
+| Follow-up | Follow-up scheduled (auto-logged) |
 
 ---
 
 ## Next Session Recommendations
 
-1. **Twilio Setup** - Add credentials and build message history fetching
-2. **n8n Workflows** - Build SMS send and drip processor workflows
-3. **Lead Detail SMS** - Add SMS section to individual lead pages
-4. **Test End-to-End** - Send test messages through full flow
-
----
-
-## Future: Multi-Tenancy for SaaS Resale
-
-**Decision Document:** `.claude/decisions/010-multi-tenancy-architecture.md`
-
-When ready to sell this CRM to other cleaning businesses:
-
-### Phase 1: MVP (First 10 Customers)
-- Separate Airtable base per customer (clone template)
-- Clerk for authentication
-- Twilio subaccounts per tenant (already planned)
-- Stripe for billing
-- Simple tenants table to map user → base ID
-
-### Phase 2: Scale (10+ Customers)
-- Migrate to Supabase PostgreSQL
-- Row-Level Security for data isolation
-- Keep Twilio subaccounts
-
-### Key Components Needed
-| Component | Tool | Purpose |
-|-----------|------|---------|
-| Auth | Clerk | Login, signup, organizations |
-| Tenant DB | Supabase | Map user → tenant config |
-| Data | Airtable → Supabase | Business data |
-| SMS | Twilio Subaccounts | Isolated per tenant |
-| Billing | Stripe | Subscriptions |
+1. **Tag Management UI** - Build settings page to manage disposition tags from the CRM
+2. **Pipeline View Tags** - Add tag filtering and display to pipeline/list view
+3. **Twilio Integration** - Connect SMS templates and activities to actual Twilio sending
+4. **Bulk Tag Assignment** - Select multiple leads and apply tags in pipeline view
 
 ---
 
 **Session End**: 2026-01-14
-**Status**: SMS infrastructure complete, awaiting Twilio credentials
+**Status**: Lead management features complete, awaiting tag management UI
