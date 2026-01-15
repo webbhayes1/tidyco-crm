@@ -13,8 +13,9 @@ interface EnrichedJob extends Job {
 }
 
 const HOURS = Array.from({ length: 13 }, (_, i) => i + 7); // 7am to 7pm
+const HOUR_HEIGHT = 60; // Height of each hour slot in pixels
 
-// Parse time string (handles both "10:00 AM" and "14:00" formats)
+// Parse time string to decimal hours (handles both "10:00 AM" and "14:00" formats)
 const parseTimeToHour = (timeStr: string): number => {
   if (!timeStr) return 0;
 
@@ -24,14 +25,15 @@ const parseTimeToHour = (timeStr: string): number => {
 
   // Remove AM/PM and trim
   const cleanTime = timeStr.replace(/\s*(am|pm)\s*/i, '').trim();
-  const [hoursStr] = cleanTime.split(':');
+  const [hoursStr, minutesStr] = cleanTime.split(':');
   let hours = parseInt(hoursStr, 10);
+  const minutes = parseInt(minutesStr || '0', 10);
 
   // Convert 12-hour to 24-hour
   if (isPM && hours !== 12) hours += 12;
   if (isAM && hours === 12) hours = 0;
 
-  return hours;
+  return hours + minutes / 60;
 };
 
 const CLEANER_COLORS: Record<string, string> = {
@@ -70,27 +72,40 @@ export default function CalendarWeeklyPage() {
     return jobDate >= weekStart && jobDate <= weekEnd;
   });
 
-  // Group jobs by day and hour
-  const jobsByDayHour = new Map<string, Map<number, EnrichedJob[]>>();
+  // Group jobs by day
+  const jobsByDay = new Map<string, EnrichedJob[]>();
   weekJobs.forEach(job => {
     const jobDate = new Date(job.fields.Date!);
     const dayKey = format(jobDate, 'yyyy-MM-dd');
 
-    if (!jobsByDayHour.has(dayKey)) {
-      jobsByDayHour.set(dayKey, new Map());
+    if (!jobsByDay.has(dayKey)) {
+      jobsByDay.set(dayKey, []);
     }
-
-    const startTime = job.fields.Time;
-    if (startTime) {
-      const hours = parseTimeToHour(startTime);
-      const hourMap = jobsByDayHour.get(dayKey)!;
-
-      if (!hourMap.has(hours)) {
-        hourMap.set(hours, []);
-      }
-      hourMap.get(hours)!.push(job);
-    }
+    jobsByDay.get(dayKey)!.push(job);
   });
+
+  // Calculate job position and height based on start/end time
+  const getJobStyle = (job: EnrichedJob) => {
+    const startTime = job.fields.Time;
+    const endTime = job.fields['End Time'];
+
+    if (!startTime) {
+      // No start time - show at top of day with default height
+      return { top: 0, height: HOUR_HEIGHT };
+    }
+
+    const startHour = parseTimeToHour(startTime);
+    // Use end time if available, otherwise calculate from duration or default to 2 hours
+    const endHour = endTime
+      ? parseTimeToHour(endTime)
+      : startHour + (job.fields['Duration Hours'] || 2);
+
+    // Calculate position (7am = 0, 8pm = 13 hours * HOUR_HEIGHT)
+    const top = (startHour - 7) * HOUR_HEIGHT;
+    const height = Math.max((endHour - startHour) * HOUR_HEIGHT, 40); // Minimum 40px height
+
+    return { top, height };
+  };
 
   // Calculate week stats
   const totalJobs = weekJobs.length;
@@ -207,91 +222,123 @@ export default function CalendarWeeklyPage() {
         </div>
       </div>
 
-      {/* Weekly Grid */}
+      {/* Weekly Grid - Google Calendar Style */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-        <div className="grid grid-cols-8 min-w-[1200px]">
-          {/* Header Row */}
-          <div className="border-b border-gray-200 p-4 bg-gray-50 font-semibold">
-            Time
+        <div className="min-w-[1200px]">
+          {/* Header Row with Day Names */}
+          <div className="flex border-b border-gray-200 sticky top-0 bg-white z-20">
+            <div className="w-16 flex-shrink-0 p-2 bg-gray-50 border-r border-gray-200" />
+            {weekDays.map(day => (
+              <div
+                key={day.toISOString()}
+                className={`flex-1 p-3 text-center border-r border-gray-200 last:border-r-0 ${
+                  isSameDay(day, new Date()) ? 'bg-blue-50' : 'bg-gray-50'
+                }`}
+              >
+                <div className="text-sm font-medium text-gray-600">{format(day, 'EEE')}</div>
+                <div className={`text-2xl font-bold ${
+                  isSameDay(day, new Date()) ? 'text-blue-600' : 'text-gray-900'
+                }`}>
+                  {format(day, 'd')}
+                </div>
+              </div>
+            ))}
           </div>
-          {weekDays.map(day => (
-            <div
-              key={day.toISOString()}
-              className={`border-b border-l border-gray-200 p-4 text-center ${
-                isSameDay(day, new Date()) ? 'bg-blue-50' : 'bg-gray-50'
-              }`}
-            >
-              <div className="font-semibold">{format(day, 'EEE')}</div>
-              <div className={`text-2xl ${
-                isSameDay(day, new Date()) ? 'text-blue-600' : 'text-gray-900'
-              }`}>
-                {format(day, 'd')}
-              </div>
+
+          {/* Time Grid with Jobs */}
+          <div className="flex">
+            {/* Hour Labels Column */}
+            <div className="w-16 flex-shrink-0 border-r border-gray-200 bg-gray-50">
+              {HOURS.map(hour => (
+                <div
+                  key={hour}
+                  className="border-b border-gray-100 text-xs text-gray-500 text-right pr-2 pt-1"
+                  style={{ height: HOUR_HEIGHT }}
+                >
+                  {hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
+                </div>
+              ))}
             </div>
-          ))}
 
-          {/* Time Rows */}
-          {HOURS.map(hour => (
-            <div key={hour} className="contents">
-              {/* Hour Label */}
-              <div className="border-b border-gray-200 p-4 bg-gray-50 text-sm text-gray-600">
-                {hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
-              </div>
+            {/* Day Columns */}
+            {weekDays.map(day => {
+              const dayKey = format(day, 'yyyy-MM-dd');
+              const dayJobs = jobsByDay.get(dayKey) || [];
 
-              {/* Day Cells */}
-              {weekDays.map(day => {
-                const dayKey = format(day, 'yyyy-MM-dd');
-                const hourJobs = jobsByDayHour.get(dayKey)?.get(hour) || [];
+              return (
+                <div
+                  key={day.toISOString()}
+                  className={`flex-1 border-r border-gray-200 last:border-r-0 relative ${
+                    isSameDay(day, new Date()) ? 'bg-blue-50 bg-opacity-20' : ''
+                  }`}
+                  style={{ height: HOURS.length * HOUR_HEIGHT }}
+                >
+                  {/* Hour Grid Lines */}
+                  {HOURS.map((hour, idx) => (
+                    <div
+                      key={hour}
+                      className={`absolute left-0 right-0 border-b border-gray-100 ${
+                        hour === 12 ? 'bg-gray-100 bg-opacity-50' : ''
+                      }`}
+                      style={{ top: idx * HOUR_HEIGHT, height: HOUR_HEIGHT }}
+                    />
+                  ))}
 
-                return (
-                  <div
-                    key={`${day.toISOString()}-${hour}`}
-                    className={`border-b border-l border-gray-200 p-2 min-h-[100px] relative ${
-                      isSameDay(day, new Date()) ? 'bg-blue-50 bg-opacity-30' : ''
-                    }`}
-                  >
-                    {/* Lunch indicator (12pm) */}
-                    {hour === 12 && (
-                      <div className="absolute inset-0 bg-gray-100 opacity-30 pointer-events-none" />
-                    )}
+                  {/* Jobs - Absolutely Positioned */}
+                  {dayJobs.map((job, jobIdx) => {
+                    const style = getJobStyle(job);
+                    const color = getCleanerColor(job.cleanerName);
+                    const startTime = job.fields.Time || '';
+                    const endTime = job.fields['End Time'] || '';
 
-                    {/* Jobs */}
-                    <div className="space-y-1">
-                      {hourJobs.map(job => {
-                        const color = getCleanerColor(job.cleanerName);
-                        const duration = job.fields['Duration Hours'] || 2;
+                    // Handle overlapping jobs by offsetting horizontally
+                    const overlappingJobs = dayJobs.filter((otherJob, otherIdx) => {
+                      if (otherIdx >= jobIdx) return false;
+                      const otherStyle = getJobStyle(otherJob);
+                      return !(style.top >= otherStyle.top + otherStyle.height ||
+                               style.top + style.height <= otherStyle.top);
+                    });
+                    const leftOffset = overlappingJobs.length * 20;
+                    const widthReduction = overlappingJobs.length * 20;
 
-                        return (
-                          <Link
-                            key={job.id}
-                            href={`/jobs/${job.id}`}
-                            className="block p-2 rounded text-white text-xs hover:shadow-lg transition-shadow"
-                            style={{
-                              backgroundColor: color,
-                              minHeight: `${duration * 20}px`
-                            }}
-                          >
-                            <div className="font-semibold truncate">
-                              {job.clientName}
-                            </div>
-                            <div className="truncate">
-                              {job.fields['Service Type']?.replace(' Cleaning', '')}
-                            </div>
-                            <div className="truncate opacity-90">
-                              {job.cleanerName}
-                            </div>
-                            <div className="truncate opacity-90">
-                              ${job.fields['Amount Charged']}
-                            </div>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+                    return (
+                      <Link
+                        key={job.id}
+                        href={`/jobs/${job.id}`}
+                        className="absolute rounded-lg p-2 text-white text-xs hover:shadow-lg transition-all cursor-pointer overflow-hidden z-10"
+                        style={{
+                          top: style.top + 2,
+                          height: style.height - 4,
+                          left: 4 + leftOffset,
+                          right: 4 + widthReduction,
+                          backgroundColor: color,
+                        }}
+                      >
+                        <div className="font-semibold truncate text-sm">
+                          {job.clientName}
+                        </div>
+                        {style.height > 50 && (
+                          <div className="truncate">
+                            {job.fields['Service Type']?.replace(' Cleaning', '')}
+                          </div>
+                        )}
+                        {style.height > 70 && (
+                          <div className="truncate opacity-90">
+                            {job.cleanerName}
+                          </div>
+                        )}
+                        {style.height > 90 && (
+                          <div className="truncate opacity-90">
+                            {startTime}{endTime ? ` - ${endTime}` : ''} • ${job.fields['Amount Charged']}
+                          </div>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
