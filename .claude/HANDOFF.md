@@ -179,5 +179,34 @@ N8N_WEBHOOK_URL=http://localhost:5678
 
 ---
 
+## Future: Multi-Tenancy for SaaS Resale
+
+**Decision Document:** `.claude/decisions/010-multi-tenancy-architecture.md`
+
+When ready to sell this CRM to other cleaning businesses:
+
+### Phase 1: MVP (First 10 Customers)
+- Separate Airtable base per customer (clone template)
+- Clerk for authentication
+- Twilio subaccounts per tenant (already planned)
+- Stripe for billing
+- Simple tenants table to map user → base ID
+
+### Phase 2: Scale (10+ Customers)
+- Migrate to Supabase PostgreSQL
+- Row-Level Security for data isolation
+- Keep Twilio subaccounts
+
+### Key Components Needed
+| Component | Tool | Purpose |
+|-----------|------|---------|
+| Auth | Clerk | Login, signup, organizations |
+| Tenant DB | Supabase | Map user → tenant config |
+| Data | Airtable → Supabase | Business data |
+| SMS | Twilio Subaccounts | Isolated per tenant |
+| Billing | Stripe | Subscriptions |
+
+---
+
 **Session End**: 2026-01-14
 **Status**: SMS infrastructure complete, awaiting Twilio credentials
