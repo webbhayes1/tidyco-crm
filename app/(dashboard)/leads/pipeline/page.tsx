@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { DataTable, Column } from '@/components/DataTable';
 import { QuickStatusSelect } from '@/components/QuickStatusSelect';
@@ -16,7 +16,7 @@ const STATUS_ORDER: LeadStatus[] = ['New', 'Contacted', 'Qualified', 'Quote Sent
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<string>('active');
+  const [statusFilter, setStatusFilter] = useState<string[]>([]); // Empty = show active (non-closed)
   const [showImportModal, setShowImportModal] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -24,6 +24,8 @@ export default function LeadsPage() {
   const [serviceFilter, setServiceFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('status');
   const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [showStatusDropdown, setShowStatusDropdown] = useState<boolean>(false);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
 
   const fetchLeads = useCallback(async () => {
     try {
@@ -40,6 +42,17 @@ export default function LeadsPage() {
   useEffect(() => {
     fetchLeads();
   }, [fetchLeads]);
+
+  // Close status dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(e.target as Node)) {
+        setShowStatusDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const getSourceBadgeColor = (source: string) => {
     switch (source) {
@@ -152,10 +165,19 @@ export default function LeadsPage() {
 
   // Count active filters for badge
   const activeFilterCount = [
-    filter !== 'active',
+    statusFilter.length > 0,
     sourceFilter !== 'all',
     serviceFilter !== 'all',
   ].filter(Boolean).length;
+
+  // Toggle a status in the multi-select
+  const toggleStatus = (status: string) => {
+    setStatusFilter(prev =>
+      prev.includes(status)
+        ? prev.filter(s => s !== status)
+        : [...prev, status]
+    );
+  };
 
   // Filter leads based on search and selected filters
   const filteredLeads = leads
@@ -185,11 +207,12 @@ export default function LeadsPage() {
     })
     .filter((lead) => {
       const status = lead.fields.Status || 'New';
-      if (filter === 'active') {
+      // If no status filter selected, show active (non-closed) leads
+      if (statusFilter.length === 0) {
         return !['Won', 'Lost', 'Churned'].includes(status);
       }
-      if (filter === 'all') return true;
-      return status === filter;
+      // Otherwise show leads matching any selected status
+      return statusFilter.includes(status);
     })
     .filter((lead) => {
       // Lead source filter
@@ -216,9 +239,9 @@ export default function LeadsPage() {
         const timeB = b.createdTime || '';
         return timeB.localeCompare(timeA);
       case 'newest':
-        return (b.createdTime || '').localeCompare(a.createdTime || '');
-      case 'oldest':
         return (a.createdTime || '').localeCompare(b.createdTime || '');
+      case 'oldest':
+        return (b.createdTime || '').localeCompare(a.createdTime || '');
       case 'name-asc':
         return (a.fields.Name || '').localeCompare(b.fields.Name || '');
       case 'name-desc':
@@ -338,47 +361,71 @@ export default function LeadsPage() {
         {showFilters && (
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
             <div className="flex flex-wrap items-center gap-4">
-              {/* Status Filter */}
-              <div className="flex flex-col gap-2">
+              {/* Status Filter - Multi-select Dropdown */}
+              <div className="flex flex-col gap-2 relative" ref={statusDropdownRef}>
                 <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</label>
-                <div className="flex flex-wrap gap-2">
+                <div className="relative">
                   <button
-                    onClick={() => setFilter('active')}
-                    className={`px-3 py-1.5 text-sm font-medium rounded-md ${
-                      filter === 'active'
-                        ? 'bg-primary-600 text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-                    }`}
+                    onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-md bg-white min-w-[180px] text-left flex items-center justify-between"
                   >
-                    Active ({activeCount})
+                    <span className={statusFilter.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
+                      {statusFilter.length === 0
+                        ? 'Active (default)'
+                        : statusFilter.length === 1
+                        ? statusFilter[0]
+                        : `${statusFilter.length} selected`}
+                    </span>
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
                   </button>
-                  <button
-                    onClick={() => setFilter('all')}
-                    className={`px-3 py-1.5 text-sm font-medium rounded-md ${
-                      filter === 'all'
-                        ? 'bg-primary-600 text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-                    }`}
-                  >
-                    All
-                  </button>
-                  {STATUS_ORDER.map((status) => (
-                    <button
-                      key={status}
-                      onClick={() => setFilter(status)}
-                      className={`px-3 py-1.5 text-sm font-medium rounded-md ${
-                        filter === status
-                          ? status === 'Won' ? 'bg-green-600 text-white'
-                          : status === 'Lost' ? 'bg-red-600 text-white'
-                          : 'bg-primary-600 text-white'
-                          : status === 'Won' ? 'bg-white text-green-700 hover:bg-green-50 border border-green-300'
-                          : status === 'Lost' ? 'bg-white text-red-600 hover:bg-red-50 border border-red-300'
-                          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-                      }`}
-                    >
-                      {status} ({statusCounts[status] || 0})
-                    </button>
-                  ))}
+                  {showStatusDropdown && (
+                    <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
+                      <div className="p-2 border-b border-gray-100">
+                        <button
+                          onClick={() => { setStatusFilter([]); setShowStatusDropdown(false); }}
+                          className={`w-full text-left px-2 py-1.5 text-sm rounded ${
+                            statusFilter.length === 0 ? 'bg-primary-50 text-primary-700' : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          Active only ({activeCount})
+                        </button>
+                        <button
+                          onClick={() => { setStatusFilter([...STATUS_ORDER]); setShowStatusDropdown(false); }}
+                          className={`w-full text-left px-2 py-1.5 text-sm rounded ${
+                            statusFilter.length === STATUS_ORDER.length ? 'bg-primary-50 text-primary-700' : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          All Statuses
+                        </button>
+                      </div>
+                      <div className="p-2 max-h-48 overflow-auto">
+                        {STATUS_ORDER.map((status) => (
+                          <label
+                            key={status}
+                            className="flex items-center px-2 py-1.5 text-sm hover:bg-gray-50 rounded cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={statusFilter.includes(status)}
+                              onChange={() => toggleStatus(status)}
+                              className="mr-2 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            />
+                            <span className={`flex-1 ${
+                              status === 'Won' ? 'text-green-700' :
+                              status === 'Lost' ? 'text-red-600' :
+                              status === 'Churned' ? 'text-gray-500' :
+                              'text-gray-700'
+                            }`}>
+                              {status}
+                            </span>
+                            <span className="text-gray-400 text-xs">{statusCounts[status] || 0}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -422,7 +469,7 @@ export default function LeadsPage() {
                   <label className="text-xs font-medium text-transparent">Clear</label>
                   <button
                     onClick={() => {
-                      setFilter('active');
+                      setStatusFilter([]);
                       setSourceFilter('all');
                       setServiceFilter('all');
                     }}

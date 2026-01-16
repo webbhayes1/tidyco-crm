@@ -238,11 +238,11 @@ export default function JobsPage() {
         case 'date-desc':
           const dateA = a.fields.Date ? parseDate(a.fields.Date).getTime() : 0;
           const dateB = b.fields.Date ? parseDate(b.fields.Date).getTime() : 0;
-          return dateB - dateA;
+          return dateA - dateB;
         case 'date-asc':
           const dateA2 = a.fields.Date ? parseDate(a.fields.Date).getTime() : 0;
           const dateB2 = b.fields.Date ? parseDate(b.fields.Date).getTime() : 0;
-          return dateA2 - dateB2;
+          return dateB2 - dateA2;
         case 'client-asc':
           return (a.clientName || '').localeCompare(b.clientName || '');
         case 'client-desc':

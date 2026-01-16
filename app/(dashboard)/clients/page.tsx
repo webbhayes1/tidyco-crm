@@ -165,11 +165,11 @@ export default function ClientsPage() {
         case 'recent':
           const dateA = a.fields['Last Booking Date'] ? new Date(a.fields['Last Booking Date']).getTime() : 0;
           const dateB = b.fields['Last Booking Date'] ? new Date(b.fields['Last Booking Date']).getTime() : 0;
-          return dateB - dateA;
+          return dateA - dateB;
         case 'oldest':
           const dateA2 = a.fields['Last Booking Date'] ? new Date(a.fields['Last Booking Date']).getTime() : 0;
           const dateB2 = b.fields['Last Booking Date'] ? new Date(b.fields['Last Booking Date']).getTime() : 0;
-          return dateA2 - dateB2;
+          return dateB2 - dateA2;
         case 'cleaner-asc':
           const cleanerNameA = a.fields['Preferred Cleaner']?.[0] ? (cleanerMap.get(a.fields['Preferred Cleaner'][0]) || '') : '';
           const cleanerNameB = b.fields['Preferred Cleaner']?.[0] ? (cleanerMap.get(b.fields['Preferred Cleaner'][0]) || '') : '';
