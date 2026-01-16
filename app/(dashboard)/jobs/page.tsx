@@ -247,6 +247,18 @@ export default function JobsPage() {
           return (a.clientName || '').localeCompare(b.clientName || '');
         case 'client-desc':
           return (b.clientName || '').localeCompare(a.clientName || '');
+        case 'cleaner-asc':
+          // Unassigned jobs go to end
+          if (!a.cleanerName && !b.cleanerName) return 0;
+          if (!a.cleanerName) return 1;
+          if (!b.cleanerName) return -1;
+          return a.cleanerName.localeCompare(b.cleanerName);
+        case 'cleaner-desc':
+          // Unassigned jobs go to end
+          if (!a.cleanerName && !b.cleanerName) return 0;
+          if (!a.cleanerName) return 1;
+          if (!b.cleanerName) return -1;
+          return b.cleanerName.localeCompare(a.cleanerName);
         case 'amount-high':
           return (b.fields['Amount Charged'] || 0) - (a.fields['Amount Charged'] || 0);
         case 'amount-low':
@@ -328,6 +340,8 @@ export default function JobsPage() {
               <option value="date-asc">Date (Oldest)</option>
               <option value="client-asc">Client (A-Z)</option>
               <option value="client-desc">Client (Z-A)</option>
+              <option value="cleaner-asc">Cleaner (A-Z)</option>
+              <option value="cleaner-desc">Cleaner (Z-A)</option>
               <option value="amount-high">Amount (High-Low)</option>
               <option value="amount-low">Amount (Low-High)</option>
             </select>

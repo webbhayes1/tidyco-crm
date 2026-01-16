@@ -6,13 +6,14 @@ import { DataTable, Column } from '@/components/DataTable';
 import { QuickStatusSelect } from '@/components/QuickStatusSelect';
 import { Cleaner } from '@/types/airtable';
 import Link from 'next/link';
-import { Plus } from 'lucide-react';
+import { Plus, Search, X } from 'lucide-react';
 
 export default function CleanersPage() {
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('name-asc');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   const fetchCleaners = useCallback(async () => {
     try {
@@ -106,6 +107,22 @@ export default function CleanersPage() {
 
   const filteredCleaners = cleaners
     .filter((cleaner) => {
+      // Search filter
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const name = (cleaner.fields.Name || '').toLowerCase();
+        const email = (cleaner.fields.Email || '').toLowerCase();
+        const phone = (cleaner.fields.Phone || '').toLowerCase();
+        const experience = (cleaner.fields['Experience Level'] || '').toLowerCase();
+
+        return name.includes(query) ||
+               email.includes(query) ||
+               phone.includes(query) ||
+               experience.includes(query);
+      }
+      return true;
+    })
+    .filter((cleaner) => {
       if (filter === 'active') return cleaner.fields.Status === 'Active' || !cleaner.fields.Status;
       if (filter === 'inactive') return cleaner.fields.Status === 'Inactive';
       if (filter === 'on-leave') return cleaner.fields.Status === 'On Leave';
@@ -157,8 +174,28 @@ export default function CleanersPage() {
         }
       />
 
-      {/* Filters */}
-      <div className="space-y-2">
+      {/* Search and Filters */}
+      <div className="space-y-3">
+        {/* Search */}
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search cleaners..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-gray-700">Status:</span>
           <div className="flex space-x-2">

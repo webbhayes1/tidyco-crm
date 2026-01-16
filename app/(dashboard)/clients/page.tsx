@@ -7,7 +7,7 @@ import { QuickStatusSelect } from '@/components/QuickStatusSelect';
 import { Client, Cleaner } from '@/types/airtable';
 import { format } from 'date-fns';
 import Link from 'next/link';
-import { Plus } from 'lucide-react';
+import { Plus, Search, X } from 'lucide-react';
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
@@ -16,6 +16,7 @@ export default function ClientsPage() {
   const [filter, setFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('name-asc');
   const [cleanerFilter, setCleanerFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   const fetchData = useCallback(async () => {
     try {
@@ -117,6 +118,27 @@ export default function ClientsPage() {
   // Filter clients
   const filteredClients = clients
     .filter((client) => {
+      // Search filter
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const name = (client.fields.Name || '').toLowerCase();
+        const email = (client.fields.Email || '').toLowerCase();
+        const phone = (client.fields.Phone || '').toLowerCase();
+        const address = (client.fields.Address || '').toLowerCase();
+        const city = (client.fields.City || '').toLowerCase();
+        const cleanerId = client.fields['Preferred Cleaner']?.[0];
+        const cleanerName = cleanerId ? (cleanerMap.get(cleanerId) || '').toLowerCase() : '';
+
+        return name.includes(query) ||
+               email.includes(query) ||
+               phone.includes(query) ||
+               address.includes(query) ||
+               city.includes(query) ||
+               cleanerName.includes(query);
+      }
+      return true;
+    })
+    .filter((client) => {
       // Status filter
       if (filter === 'active') return client.fields.Status === 'Active' || !client.fields.Status;
       if (filter === 'inactive') return client.fields.Status === 'Inactive';
@@ -187,8 +209,28 @@ export default function ClientsPage() {
         }
       />
 
-      {/* Filters Row */}
+      {/* Search and Filters Row */}
       <div className="flex flex-wrap items-center gap-4">
+        {/* Search */}
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search clients..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
         {/* Status Filters */}
         <div className="flex space-x-2">
           <button
