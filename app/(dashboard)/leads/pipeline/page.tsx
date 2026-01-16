@@ -7,7 +7,7 @@ import { QuickStatusSelect } from '@/components/QuickStatusSelect';
 import { Lead } from '@/types/airtable';
 import { format } from 'date-fns';
 import Link from 'next/link';
-import { Plus, Upload, Phone, Mail, Link2, Copy, Check, ExternalLink, Search, X } from 'lucide-react';
+import { Plus, Upload, Phone, Mail, Link2, Copy, Check, ExternalLink, Search, X, Filter } from 'lucide-react';
 
 type LeadStatus = 'New' | 'Contacted' | 'Qualified' | 'Quote Sent' | 'Won' | 'Lost' | 'Churned';
 
@@ -20,6 +20,10 @@ export default function LeadsPage() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [sourceFilter, setSourceFilter] = useState<string>('all');
+  const [serviceFilter, setServiceFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('status');
+  const [showFilters, setShowFilters] = useState<boolean>(false);
 
   const fetchLeads = useCallback(async () => {
     try {
@@ -142,7 +146,18 @@ export default function LeadsPage() {
     },
   ];
 
-  // Filter leads based on search and selected filter
+  // Get unique lead sources and service types for filter dropdowns
+  const leadSources = Array.from(new Set(leads.map(l => l.fields['Lead Source']).filter(Boolean))).sort();
+  const serviceTypes = Array.from(new Set(leads.map(l => l.fields['Service Type Interested']).filter(Boolean))).sort();
+
+  // Count active filters for badge
+  const activeFilterCount = [
+    filter !== 'active',
+    sourceFilter !== 'all',
+    serviceFilter !== 'all',
+  ].filter(Boolean).length;
+
+  // Filter leads based on search and selected filters
   const filteredLeads = leads
     .filter((lead) => {
       // Search filter
@@ -175,19 +190,47 @@ export default function LeadsPage() {
       }
       if (filter === 'all') return true;
       return status === filter;
+    })
+    .filter((lead) => {
+      // Lead source filter
+      if (sourceFilter === 'all') return true;
+      return lead.fields['Lead Source'] === sourceFilter;
+    })
+    .filter((lead) => {
+      // Service type filter
+      if (serviceFilter === 'all') return true;
+      return lead.fields['Service Type Interested'] === serviceFilter;
     });
 
-  // Sort by status order, then by Airtable creation time (newest first)
+  // Sort leads based on selected sort option
   const sortedLeads = [...filteredLeads].sort((a, b) => {
-    const statusA = a.fields.Status || 'New';
-    const statusB = b.fields.Status || 'New';
-    const orderA = STATUS_ORDER.indexOf(statusA as LeadStatus);
-    const orderB = STATUS_ORDER.indexOf(statusB as LeadStatus);
-    if (orderA !== orderB) return orderA - orderB;
-    // Secondary sort by Airtable createdTime (newest first)
-    const timeA = a.createdTime || '';
-    const timeB = b.createdTime || '';
-    return timeB.localeCompare(timeA);
+    switch (sortBy) {
+      case 'status':
+        // Sort by status order, then by creation time (newest first)
+        const statusA = a.fields.Status || 'New';
+        const statusB = b.fields.Status || 'New';
+        const orderA = STATUS_ORDER.indexOf(statusA as LeadStatus);
+        const orderB = STATUS_ORDER.indexOf(statusB as LeadStatus);
+        if (orderA !== orderB) return orderA - orderB;
+        const timeA = a.createdTime || '';
+        const timeB = b.createdTime || '';
+        return timeB.localeCompare(timeA);
+      case 'newest':
+        return (b.createdTime || '').localeCompare(a.createdTime || '');
+      case 'oldest':
+        return (a.createdTime || '').localeCompare(b.createdTime || '');
+      case 'name-asc':
+        return (a.fields.Name || '').localeCompare(b.fields.Name || '');
+      case 'name-desc':
+        return (b.fields.Name || '').localeCompare(a.fields.Name || '');
+      case 'followup':
+        // Sort by next follow-up date (earliest first, no date at end)
+        const dateA = a.fields['Next Follow-Up Date'] ? new Date(a.fields['Next Follow-Up Date']).getTime() : Infinity;
+        const dateB = b.fields['Next Follow-Up Date'] ? new Date(b.fields['Next Follow-Up Date']).getTime() : Infinity;
+        return dateA - dateB;
+      default:
+        return 0;
+    }
   });
 
   // Count by status for filter badges
@@ -235,65 +278,163 @@ export default function LeadsPage() {
         }
       />
 
-      {/* Search and Filters */}
-      <div className="flex flex-wrap items-center gap-4">
-        {/* Search */}
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search leads..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-      </div>
+      {/* Search and Filter Bar */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          {/* Search */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search leads..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
 
-      {/* Status Filters */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => setFilter('active')}
-          className={`px-3 py-2 text-sm font-medium rounded-md ${
-            filter === 'active'
-              ? 'bg-primary-600 text-white'
-              : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-          }`}
-        >
-          Active ({activeCount})
-        </button>
-        <button
-          onClick={() => setFilter('all')}
-          className={`px-3 py-2 text-sm font-medium rounded-md ${
-            filter === 'all'
-              ? 'bg-primary-600 text-white'
-              : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-          }`}
-        >
-          All ({leads.length})
-        </button>
-        <div className="border-l border-gray-300 mx-2" />
-        {STATUS_ORDER.map((status) => (
+          {/* Filters Button */}
           <button
-            key={status}
-            onClick={() => setFilter(status)}
-            className={`px-3 py-2 text-sm font-medium rounded-md ${
-              filter === status
-                ? 'bg-primary-600 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+            onClick={() => setShowFilters(!showFilters)}
+            className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border ${
+              showFilters || activeFilterCount > 0
+                ? 'bg-primary-50 text-primary-700 border-primary-300'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
             }`}
           >
-            {status} ({statusCounts[status] || 0})
+            <Filter className="h-4 w-4 mr-2" />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="ml-2 inline-flex items-center justify-center w-5 h-5 text-xs font-bold bg-primary-600 text-white rounded-full">
+                {activeFilterCount}
+              </span>
+            )}
           </button>
-        ))}
+
+          {/* Sort */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white"
+          >
+            <option value="status">Sort by Status</option>
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="name-asc">Name (A-Z)</option>
+            <option value="name-desc">Name (Z-A)</option>
+            <option value="followup">Follow-Up Date</option>
+          </select>
+        </div>
+
+        {/* Collapsible Filters Panel */}
+        {showFilters && (
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Status Filter */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setFilter('active')}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md ${
+                      filter === 'active'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                    }`}
+                  >
+                    Active ({activeCount})
+                  </button>
+                  <button
+                    onClick={() => setFilter('all')}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md ${
+                      filter === 'all'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                    }`}
+                  >
+                    All
+                  </button>
+                  {STATUS_ORDER.map((status) => (
+                    <button
+                      key={status}
+                      onClick={() => setFilter(status)}
+                      className={`px-3 py-1.5 text-sm font-medium rounded-md ${
+                        filter === status
+                          ? status === 'Won' ? 'bg-green-600 text-white'
+                          : status === 'Lost' ? 'bg-red-600 text-white'
+                          : 'bg-primary-600 text-white'
+                          : status === 'Won' ? 'bg-white text-green-700 hover:bg-green-50 border border-green-300'
+                          : status === 'Lost' ? 'bg-white text-red-600 hover:bg-red-50 border border-red-300'
+                          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                      }`}
+                    >
+                      {status} ({statusCounts[status] || 0})
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Lead Source Filter */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Source</label>
+                <select
+                  value={sourceFilter}
+                  onChange={(e) => setSourceFilter(e.target.value)}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-md bg-white min-w-[150px]"
+                >
+                  <option value="all">All Sources</option>
+                  {leadSources.map(source => (
+                    <option key={source} value={source}>
+                      {source}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Service Type Filter */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Service</label>
+                <select
+                  value={serviceFilter}
+                  onChange={(e) => setServiceFilter(e.target.value)}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-md bg-white min-w-[150px]"
+                >
+                  <option value="all">All Services</option>
+                  {serviceTypes.map(type => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Clear Filters */}
+              {activeFilterCount > 0 && (
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-medium text-transparent">Clear</label>
+                  <button
+                    onClick={() => {
+                      setFilter('active');
+                      setSourceFilter('all');
+                      setServiceFilter('all');
+                    }}
+                    className="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md border border-red-200"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <DataTable
