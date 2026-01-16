@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createLead, getLeads } from '@/lib/airtable';
 
-// Map common field names from various lead sources to our schema
+// Map Angi's field names to our schema (based on Angi Lead Integration API docs)
 function normalizeLeadData(data: Record<string, unknown>): Record<string, unknown> {
   const normalized: Record<string, unknown> = {};
 
-  // Name variations - check for full name first, then combine first+last
+  // Name - Angi sends 'name' (always), plus 'firstName'/'lastName' (sometimes)
   let name = data.name || data.customer_name || data.full_name || data.Name;
 
   // If no full name, try to combine first + last name
   if (!name) {
-    const firstName = data.first_name || data.firstName || data.customer_first_name ||
-      data.customerFirstName || data['Customer First Name'] || '';
-    const lastName = data.last_name || data.lastName || data.customer_last_name ||
-      data.customerLastName || data['Customer Last Name'] || '';
+    const firstName = data.firstName || data.first_name || data.customer_first_name || '';
+    const lastName = data.lastName || data.last_name || data.customer_last_name || '';
 
     if (firstName || lastName) {
       name = [firstName, lastName].filter(Boolean).join(' ');
@@ -22,78 +20,92 @@ function normalizeLeadData(data: Record<string, unknown>): Record<string, unknow
 
   if (name) normalized.Name = String(name).trim();
 
-  // Email variations
-  const email = data.email || data.customer_email || data.Email || data.emailAddress;
+  // Email - Angi sends 'email'
+  const email = data.email || data.customer_email || data.Email;
   if (email) normalized.Email = String(email);
 
-  // Phone variations
-  const phone = data.phone || data.customer_phone || data.phone_number ||
-    data.Phone || data.phoneNumber || data.mobile;
+  // Phone - Angi sends 'primaryPhone'
+  const phone = data.primaryPhone || data.phone || data.customer_phone || data.Phone;
   if (phone) normalized.Phone = String(phone);
 
-  // Address variations
-  const address = data.address || data.street_address || data.street ||
-    data.Address || data.streetAddress;
+  // Address - Angi sends 'address'
+  const address = data.address || data.street_address || data.Address;
   if (address) normalized.Address = String(address);
 
-  // City
+  // City - Angi sends 'city'
   const city = data.city || data.City;
   if (city) normalized.City = String(city);
 
-  // State
-  const state = data.state || data.State;
+  // State - Angi sends 'stateProvince'
+  const state = data.stateProvince || data.state || data.State;
   if (state) normalized.State = String(state);
 
-  // Zip variations
-  const zip = data.zip || data.zip_code || data.zipcode || data.postal_code ||
-    data['Zip Code'] || data.postalCode;
+  // Zip - Angi sends 'postalCode'
+  const zip = data.postalCode || data.zip || data.zip_code || data['Zip Code'];
   if (zip) normalized['Zip Code'] = String(zip);
 
-  // Lead source - try to detect from payload
-  let source = data.source || data.lead_source || data.leadSource || data['Lead Source'];
-  if (!source) {
-    // Try to detect source from other fields
-    if (data.angi_lead_id || data['Angi Lead ID'] || data.angiLeadId) {
-      source = 'Angi';
-    } else if (data.thumbtack_id || data.thumbtackId) {
-      source = 'Thumbtack';
+  // Lead source - Angi sends 'leadSource' (e.g., "HomeAdvisor", "Angi")
+  // If from Angi/HomeAdvisor, set to "Angi"
+  const leadSource = data.leadSource || data.lead_source || data['Lead Source'];
+  if (leadSource) {
+    const src = String(leadSource).toLowerCase();
+    if (src.includes('angi') || src.includes('homeadvisor') || src.includes('home advisor')) {
+      normalized['Lead Source'] = 'Angi';
+    } else if (['referral', 'direct', 'google', 'facebook', 'thumbtack', 'other'].includes(src)) {
+      normalized['Lead Source'] = src.charAt(0).toUpperCase() + src.slice(1);
     }
   }
-  if (source && ['Angi', 'Referral', 'Direct', 'Google', 'Facebook', 'Thumbtack', 'Other'].includes(String(source))) {
-    normalized['Lead Source'] = source;
+
+  // Auto-detect Angi source from leadOid or srOid presence
+  if (!normalized['Lead Source'] && (data.leadOid || data.srOid)) {
+    normalized['Lead Source'] = 'Angi';
   }
 
-  // Angi Lead ID for deduplication
-  const angiId = data.angi_lead_id || data['Angi Lead ID'] || data.angiLeadId ||
-    data.lead_id || data.leadId || data.id;
-  if (angiId && source === 'Angi') {
-    normalized['Angi Lead ID'] = String(angiId);
+  // Angi Lead ID - use 'leadOid' for deduplication (unique lead ID from Angi)
+  const angiLeadId = data.leadOid || data.angi_lead_id || data['Angi Lead ID'];
+  if (angiLeadId) {
+    normalized['Angi Lead ID'] = String(angiLeadId);
+    // If we have a leadOid, this is definitely from Angi
+    if (!normalized['Lead Source']) {
+      normalized['Lead Source'] = 'Angi';
+    }
   }
 
-  // Service type
-  const serviceType = data.service_type || data.service || data.category ||
-    data['Service Type Interested'] || data.serviceType;
-  if (serviceType) {
-    const st = String(serviceType).toLowerCase();
-    if (st.includes('deep') || st.includes('heavy')) {
+  // Service type - Angi sends 'taskName' (e.g., "House Cleaning Service")
+  const taskName = data.taskName || data.service_type || data.service || data.category;
+  if (taskName) {
+    const task = String(taskName).toLowerCase();
+    if (task.includes('deep') || task.includes('heavy') || task.includes('spring')) {
       normalized['Service Type Interested'] = 'Deep Clean';
-    } else if (st.includes('move') || st.includes('moving')) {
+    } else if (task.includes('move') || task.includes('moving')) {
       normalized['Service Type Interested'] = 'Move-In-Out';
     } else {
       normalized['Service Type Interested'] = 'General Clean';
     }
   }
 
-  // Bedrooms/Bathrooms
-  const bedrooms = data.bedrooms || data.beds || data.Bedrooms;
-  if (bedrooms) normalized.Bedrooms = parseInt(String(bedrooms)) || undefined;
+  // Notes - Angi sends 'comments'
+  // Also build notes from interview Q&A if present
+  let notes = data.comments || data.notes || data.message || data.Notes || '';
 
-  const bathrooms = data.bathrooms || data.baths || data.Bathrooms;
-  if (bathrooms) normalized.Bathrooms = parseFloat(String(bathrooms)) || undefined;
+  // Process interview array if present (Angi sends Q&A about the service)
+  const interview = data.interview as Array<{ question: string; answer: string }> | undefined;
+  if (interview && Array.isArray(interview)) {
+    const interviewText = interview
+      .map(qa => `Q: ${qa.question}\nA: ${qa.answer}`)
+      .join('\n\n');
+    if (interviewText) {
+      notes = notes ? `${notes}\n\n--- Interview Details ---\n${interviewText}` : interviewText;
+    }
+  }
 
-  // Notes/Message
-  const notes = data.notes || data.message || data.comments || data.description ||
-    data.Notes || data.Message;
+  // Add lead fee info if present
+  const fee = data.fee;
+  if (fee !== undefined && fee !== null) {
+    const feeNote = `Lead Fee: $${fee}`;
+    notes = notes ? `${notes}\n\n${feeNote}` : feeNote;
+  }
+
   if (notes) normalized.Notes = String(notes);
 
   // Owner - default to Webb for external leads
@@ -101,9 +113,6 @@ function normalizeLeadData(data: Record<string, unknown>): Record<string, unknow
 
   // Always set status to New
   normalized.Status = 'New';
-
-  // Set Created Date to now
-  normalized['Created Date'] = new Date().toISOString().split('T')[0];
 
   return normalized;
 }
@@ -139,13 +148,14 @@ export async function POST(request: NextRequest) {
         try {
           data = JSON.parse(text);
         } catch {
-          return NextResponse.json(
-            { success: false, error: 'Invalid request format' },
-            { status: 400 }
-          );
+          // Angi expects {"status":"success"} format - return error in same format
+          return NextResponse.json({ status: 'error', message: 'Invalid request format' }, { status: 400 });
         }
       }
     }
+
+    // Log incoming payload for debugging (will show in Vercel logs)
+    console.log('Webhook received:', JSON.stringify(data, null, 2));
 
     // Handle if data is wrapped in a body object
     if (data.body && typeof data.body === 'object') {
@@ -157,40 +167,29 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!normalizedData.Name) {
-      return NextResponse.json(
-        { success: false, error: 'Missing required field: name' },
-        { status: 400 }
-      );
+      return NextResponse.json({ status: 'error', message: 'Missing required field: name' }, { status: 400 });
     }
 
     // Check for duplicates by Angi Lead ID
     if (normalizedData['Angi Lead ID']) {
       const duplicate = await isDuplicate(String(normalizedData['Angi Lead ID']));
       if (duplicate) {
-        return NextResponse.json(
-          { success: true, message: 'Lead already exists', duplicate: true },
-          { status: 200 }
-        );
+        // Angi expects {"status":"success"} even for duplicates
+        console.log('Duplicate lead detected:', normalizedData['Angi Lead ID']);
+        return NextResponse.json({ status: 'success' });
       }
     }
 
     // Create the lead in Airtable
     const lead = await createLead(normalizedData as Parameters<typeof createLead>[0]);
 
-    return NextResponse.json({
-      success: true,
-      message: 'Lead created successfully',
-      lead: {
-        id: lead.id,
-        name: lead.fields.Name,
-      },
-    });
+    console.log('Lead created:', lead.id, normalizedData.Name);
+
+    // Angi requires exactly {"status":"success"} response
+    return NextResponse.json({ status: 'success' });
   } catch (error) {
     console.error('Webhook error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to process lead' },
-      { status: 500 }
-    );
+    return NextResponse.json({ status: 'error', message: 'Failed to process lead' }, { status: 500 });
   }
 }
 
@@ -198,15 +197,16 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     status: 'ok',
-    message: 'TidyCo Lead Webhook is active',
+    message: 'TidyCo Lead Webhook is active and Angi-compatible',
     usage: {
       method: 'POST',
       contentType: 'application/json',
-      requiredFields: ['name'],
-      optionalFields: [
-        'email', 'phone', 'address', 'city', 'state', 'zip',
-        'service_type', 'notes', 'lead_source', 'angi_lead_id'
+      angiFields: [
+        'name', 'firstName', 'lastName', 'address', 'city', 'stateProvince',
+        'postalCode', 'primaryPhone', 'email', 'leadOid', 'srOid', 'taskName',
+        'comments', 'leadSource', 'interview', 'fee'
       ],
+      response: { status: 'success' },
     },
   });
 }
