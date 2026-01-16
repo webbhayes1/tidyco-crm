@@ -9,6 +9,7 @@ export interface Client {
     'Email': string;
     'Phone': string;
     'Address': string;
+    'Address Line 2'?: string;
     'City'?: string;
     'State'?: string;
     'Zip Code'?: string;
@@ -93,6 +94,10 @@ export interface Job {
     'Time': string;
     'End Time'?: string;
     'Address'?: string;
+    'Address Line 2'?: string;
+    'City'?: string;
+    'State'?: string;
+    'Zip Code'?: string;
     'Bedrooms'?: number;
     'Bathrooms'?: number;
     'Service Type': 'General Clean' | 'Deep Clean' | 'Move-In-Out';

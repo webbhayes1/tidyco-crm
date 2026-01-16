@@ -1,7 +1,7 @@
 # Custom Next.js Portal - Status
 
-**Last Updated**: 2026-01-14
-**Session**: 19 (Quotes Reorganization)
+**Last Updated**: 2026-01-15
+**Session**: 22 (Auto-Generate Jobs Feature)
 **Progress**: Deployed to Production (100% complete)
 **Production URL**: https://tidyco-crm.vercel.app
 **GitHub Repo**: https://github.com/webbhayes1/tidyco-crm
@@ -226,6 +226,41 @@ custom/
 ---
 
 ## Session History
+
+### Session 22 (2026-01-15): Auto-Generate Jobs Feature ✅
+- **Auto-generate jobs from recurring schedule** - New feature on client edit page
+  - When editing client recurring schedule, prompts to generate jobs for next 8 weeks
+  - Generates jobs based on frequency (Weekly, Bi-Weekly, Monthly) and recurring days
+  - Calculates proper pricing: Duration Hours, Actual Hours, Amount Charged, Profit
+- **Fixed Cleaner Base Pay showing $0**
+  - Root cause: Airtable formula `Cleaner Hourly Rate × Actual Hours` needed `Actual Hours` field
+  - Fix: Added `jobFields['Actual Hours'] = durationHours` to job generation
+- **Fixed Profit showing $0**
+  - Root cause: `Profit` is a regular currency field, not a formula
+  - Fix: Added `getCleaner()` lookup to fetch cleaner's hourly rate
+  - Fix: Calculate `Profit = Amount Charged - (Cleaner Hourly Rate × Duration Hours)`
+- **Files modified**:
+  - `/app/api/clients/[id]/sync-jobs/route.ts` - Main job generation API with profit calculation
+  - `/components/ScheduleSyncModal.tsx` - Modal for sync/generate confirmation
+
+### Session 21 (2026-01-15): UI/UX Improvements ✅
+- **Address Line 2** - Added field to Clients and Jobs for apt/unit numbers
+- **Removed Daily frequency** - Removed from ClientForm and JobForm dropdowns
+- **Cleaner pay/profit** - Shows on client detail page when preferred cleaner is assigned
+- **Color-coded status filters** - Green (Active), Orange (Inactive), Red (Churned) on clients page
+- **Date format MM-DD-YYYY** - Updated across all pages
+- **Dashboard urgent matters** - Orange box showing unassigned clients/jobs, unpaid completed jobs
+- **Teams in cleaner dropdown** - Optgroups showing Teams and Individual Cleaners
+- **Filter/sort options** - Added to clients page (status, cleaner, sort) and jobs page (status, sort)
+- **Cleaner column** - Shows preferred cleaner or "Assign cleaner" on clients list
+- **Documented schedule sync issue** - Root cause and recommended fix for future implementation
+- **Deferred**: Address autocomplete (Google Places API), Draft saving on navigation
+
+### Session 20 (2026-01-15): Twilio A2P 10DLC + n8n Workflows ✅
+- Twilio A2P 10DLC Brand, Campaign, Phone Number configured
+- 7 n8n workflows built (now at 10/13)
+- Weekly calendar fixed (jobs span full duration)
+- Preferred cleaner feature on client detail page
 
 ### Session 19 (2026-01-14): Quotes Reorganization ✅
 - **Moved Quotes under Finances** - Now at `/finances/quotes` as subtab alongside Overview and Invoices

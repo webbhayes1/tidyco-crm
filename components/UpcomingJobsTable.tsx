@@ -1,7 +1,17 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { format, parseISO } from 'date-fns';
 import type { Job } from '@/types/airtable';
+
+// Helper to parse date strings correctly (avoids timezone issues)
+const parseDate = (dateStr: string) => {
+  if (!dateStr) return new Date();
+  if (dateStr.length === 10) {
+    return new Date(dateStr + 'T12:00:00');
+  }
+  return parseISO(dateStr);
+};
 
 interface UpcomingJobsTableProps {
   jobs: Job[];
@@ -49,7 +59,7 @@ export function UpcomingJobsTable({ jobs, clientMap, cleanerMap }: UpcomingJobsT
                 onClick={() => router.push(`/jobs/${job.id}`)}
               >
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {job.fields.Date || '-'}
+                  {job.fields.Date ? format(parseDate(job.fields.Date), 'MM-dd-yyyy') : '-'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {job.fields.Time || '-'}

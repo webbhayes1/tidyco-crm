@@ -1,142 +1,175 @@
 # Custom CRM Session Handoff
 
-**Date**: 2026-01-14
-**Session**: 19 (Quotes Reorganization)
+**Date**: 2026-01-15
+**Session**: 23 (Address Autocomplete & Draft Saving)
 **Implementation**: Custom (Next.js)
-**Focus Area**: Move Quotes under Finances section
+**Focus Area**: Google Places autocomplete and form draft persistence
 
 ---
 
 ## Session Summary
 
-Moved the Quotes functionality from a standalone top-level page to a subtab under Finances, alongside Invoices. Built out complete CRUD pages for Quotes that were previously missing.
+Completed two deferred items from Session 21:
+1. **Address Autocomplete** - Google Places API integration for address fields
+2. **Draft Saving** - Auto-save form data to localStorage when navigating away
+
+Also fixed a critical freezing issue with the initial autocomplete implementation and added City/State/Zip fields to JobForm.
 
 ---
 
 ## What Was Accomplished
 
-### 1. Quotes Moved Under Finances
+### 1. Address Autocomplete (Google Places API)
 
-**Before**: `/quotes` was a standalone nav item
-**After**: `/finances/quotes` as a subtab alongside Overview and Invoices
+**Created `components/AddressAutocomplete.tsx`**:
+- Uses Google Places AutocompleteService for address suggestions
+- Custom dropdown UI (not Google's default widget - caused freezing)
+- Debounced search (300ms) to avoid excessive API calls
+- Keyboard navigation (arrow keys, enter, escape)
+- Click outside to close dropdown
+- Parses address components (street, city, state, zip)
 
-### 2. Full Quotes CRUD Built
+**Integration**:
+- ClientForm: Auto-fills city, state, zip when address selected
+- LeadForm: Auto-fills city, state, zip when address selected
+- JobForm: Auto-fills city, state, zip when address selected
+- CleanerForm: Uses fullAddress selection
 
-| Page | Path | Description |
-|------|------|-------------|
-| List | `/finances/quotes` | Stats cards, status filters, sortable table |
-| Detail | `/finances/quotes/[id]` | Full quote view with status management, timeline, client info |
-| New | `/finances/quotes/new` | Form with client selection, auto-pricing calculator |
-| Edit | `/finances/quotes/[id]/edit` | Edit form with all quote fields |
+**Google Cloud Setup Required**:
+- Enable **Maps JavaScript API** (required)
+- Enable **Places API** (required)
+- API Key: Set in `.env.local` as `NEXT_PUBLIC_GOOGLE_PLACES_API_KEY`
 
-### 3. API Routes Added
+### 2. Draft Saving (localStorage)
 
-| Route | Methods | Purpose |
-|-------|---------|---------|
-| `/api/quotes/[id]` | GET, PUT, PATCH, DELETE | Single quote CRUD operations |
+**Created `hooks/useDraftSave.ts`**:
+- Auto-saves form data to localStorage every 1 second (debounced)
+- 24-hour expiration on drafts
+- Returns: `{ hasDraft, draftData, clearDraft, saveDraft, restoreDraft }`
 
-### 4. Airtable Functions Added
+**Created `components/DraftRestoreModal.tsx`**:
+- Modal asking user to restore or discard unsaved changes
+- Shows on form mount if draft exists
 
-In `lib/airtable.ts`:
-- `createQuote(fields)` - Create new quote record
-- `deleteQuote(id)` - Delete quote record
+**Integration**:
+- ClientForm: Draft save for new clients
+- LeadForm: Draft save for new leads
+- JobForm: Draft save for new jobs
+- CleanerForm: Draft save for new cleaners
 
-### 5. Navigation Updated
+### 3. JobForm Enhancements
 
-- Removed "Quotes" from main navigation bar
-- Added "Quotes" tab to Finances layout (3 tabs: Overview | Invoices | Quotes)
+**Added City, State, Zip Code fields**:
+- Updated Job type in `types/airtable.ts`
+- Added 3-column layout for City/State/Zip
+- AddressAutocomplete auto-fills these fields
+
+**Auto-fill from Client**:
+- When selecting a client, auto-fills: address, apt/unit, city, state, zip, bedrooms, bathrooms, hourly rate
+
+### 4. Bug Fixes
+
+**Fixed AddressAutocomplete Freezing**:
+- Initial implementation used Google's Autocomplete widget bound to input
+- This caused infinite loops/re-renders when typing
+- **Solution**: Rewrote to use AutocompleteService manually with custom dropdown
+- Debounced search prevents excessive API calls
+
+### 5. Project Organization
+
+**Created `.claude/BACKLOG.md`**:
+- New file for tracking future enhancement requests
+- Added "International Address Support" as first backlog item (currently US-only)
 
 ---
 
 ## Files Created
 
-| File | Description |
-|------|-------------|
-| `app/(dashboard)/finances/quotes/page.tsx` | Quotes list page |
-| `app/(dashboard)/finances/quotes/[id]/page.tsx` | Quote detail page |
-| `app/(dashboard)/finances/quotes/new/page.tsx` | New quote form |
-| `app/(dashboard)/finances/quotes/[id]/edit/page.tsx` | Edit quote form |
-| `app/api/quotes/[id]/route.ts` | Single quote API |
+| File | Purpose |
+|------|---------|
+| `components/AddressAutocomplete.tsx` | Google Places autocomplete component |
+| `hooks/useDraftSave.ts` | localStorage draft persistence hook |
+| `components/DraftRestoreModal.tsx` | Modal for restoring saved drafts |
+| `.claude/BACKLOG.md` | Future enhancements backlog |
 
 ## Files Modified
 
 | File | Changes |
 |------|---------|
-| `app/(dashboard)/finances/layout.tsx` | Added Quotes tab |
-| `app/api/quotes/route.ts` | Added POST method |
-| `components/Navigation.tsx` | Removed Quotes from main nav |
-| `lib/airtable.ts` | Added createQuote, deleteQuote functions |
+| `components/ClientForm.tsx` | Added AddressAutocomplete, draft save |
+| `components/LeadForm.tsx` | Added AddressAutocomplete, draft save |
+| `components/JobForm.tsx` | Added AddressAutocomplete, city/state/zip fields, client auto-fill, draft save |
+| `components/CleanerForm.tsx` | Added AddressAutocomplete, draft save |
+| `types/airtable.ts` | Added City, State, Zip Code to Job interface |
+| `.env.local` | Added NEXT_PUBLIC_GOOGLE_PLACES_API_KEY |
+| `CLAUDE.md` | Added link to BACKLOG.md |
 
-## Files Deleted
+---
 
-| File | Reason |
-|------|--------|
-| `app/(dashboard)/quotes/page.tsx` | Replaced by `/finances/quotes` |
+## Environment Variables Added
+
+```bash
+# Google Places API (for address autocomplete)
+NEXT_PUBLIC_GOOGLE_PLACES_API_KEY=AIzaSyB350uQ-p-dyZsHEJLLMyPVOCy1Ry9_b0I
+```
+
+**Important**: For production (Vercel), add this env var in Vercel dashboard.
+
+---
+
+## Technical Notes
+
+### AddressAutocomplete Architecture
+
+The component uses Google's AutocompleteService instead of the Autocomplete widget:
+
+```
+User types → Debounce 300ms → AutocompleteService.getPlacePredictions()
+                                    ↓
+                            Custom dropdown renders predictions
+                                    ↓
+User selects → PlacesService.getDetails() → Parse components → Callback
+```
+
+This approach:
+- Avoids input hijacking (no freezing)
+- Full control over UI/UX
+- Keyboard navigation support
+- Clean separation of concerns
+
+### Country Restriction
+
+Currently hardcoded to US addresses:
+```typescript
+componentRestrictions: { country: 'us' }
+```
+
+Noted in BACKLOG.md for future settings-based configuration.
 
 ---
 
 ## Build Status
 
-✅ Build completed successfully (51 pages generated)
-
-New pages in build output:
-```
-├ ○ /finances/quotes                     2.59 kB         103 kB
-├ ƒ /finances/quotes/[id]                3.76 kB         104 kB
-├ ƒ /finances/quotes/[id]/edit           3.23 kB        97.2 kB
-├ ○ /finances/quotes/new                 3.12 kB          97 kB
-```
+Dev server running successfully. All changes compile without errors.
 
 ---
 
-## Quote Features
+## Known Issues / Limitations
 
-### List Page
-- Stats: Total quotes, Pending/Sent count, Conversion rate, Accepted value
-- Status filters: All, Pending, Sent, Accepted, Rejected, Expired
-- Table with: Quote name, Client, Service type, Price, Status, Created date
-- Click row to view detail
-
-### Detail Page
-- Full quote info: Service type, hours, rate, price
-- Property details: Address, bedrooms, bathrooms
-- Status management: Click to update status
-- Timeline: Created, Sent, Expires, Response dates
-- Quick actions: Convert to Job (for Accepted), Edit, Delete
-- Client card with link
-
-### New/Edit Forms
-- Client dropdown with auto-fill (address, bedrooms, bathrooms, rate from client)
-- Service type selection
-- Property details (bedrooms, bathrooms)
-- Address and zip code
-- Hourly rate with price calculator preview
-- Quote notes (visible to client) and internal notes
-
-### Pricing Calculator
-Estimated hours formula:
-- General Clean: 1.5 base + (bedrooms * 0.5) + (bathrooms * 0.3)
-- Deep Clean: 3 base + (bedrooms * 0.5) + (bathrooms * 0.3)
-- Move-In-Out: 4 base + (bedrooms * 0.5) + (bathrooms * 0.3)
-
-Price = Estimated Hours × Hourly Rate
-
----
-
-## No Airtable Changes
-
-This session only reorganized existing functionality. No Airtable schema changes were made.
+1. **Address autocomplete US-only**: Hardcoded to US addresses (noted in BACKLOG.md)
+2. **Google API costs**: Places API has usage costs beyond free tier
+3. **Production API key**: Need to add to Vercel environment variables
 
 ---
 
 ## Next Session Recommendations
 
-1. **Test Quotes Flow** - Create a test quote, send it, accept it, convert to job
-2. **Tag Management UI** - Build settings page to manage disposition tags from CRM
-3. **Pipeline View Tags** - Add tag filtering and display to leads list
-4. **Twilio Integration** - Connect SMS to actual sending
+1. **Deploy to production**: Push changes to Vercel, add Google API key to env vars
+2. **Test draft restore**: Verify draft modal appears correctly after page refresh
+3. **Continue with remaining Session 21 items** (if any)
+4. **n8n workflows**: Continue workflow development
 
 ---
 
-**Session End**: 2026-01-14
-**Status**: Quotes successfully moved under Finances with full CRUD
+**Session End**: 2026-01-15
+**Status**: Address autocomplete and draft saving complete

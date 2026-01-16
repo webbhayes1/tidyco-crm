@@ -1,7 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { Cleaner } from '@/types/airtable';
+import { AddressAutocomplete } from './AddressAutocomplete';
+import { DraftRestoreModal } from './DraftRestoreModal';
+import { useDraftSave } from '@/hooks/useDraftSave';
 
 interface CleanerFormProps {
   cleaner?: Cleaner;
@@ -111,6 +114,34 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
     parsePreferredHours(cleaner?.fields['Preferred Hours'], cleaner?.fields.Availability)
   );
 
+  // Draft save functionality - only for new cleaners
+  const isNewCleaner = !cleaner;
+  const { hasDraft, draftData, clearDraft } = useDraftSave({
+    key: 'new-cleaner',
+    data: formData,
+    enabled: isNewCleaner,
+  });
+
+  const [showDraftModal, setShowDraftModal] = useState(false);
+
+  useEffect(() => {
+    if (hasDraft && draftData && isNewCleaner) {
+      setShowDraftModal(true);
+    }
+  }, [hasDraft, draftData, isNewCleaner]);
+
+  const handleRestoreDraft = useCallback(() => {
+    if (draftData) {
+      setFormData(draftData as typeof formData);
+    }
+    setShowDraftModal(false);
+  }, [draftData]);
+
+  const handleDiscardDraft = useCallback(() => {
+    clearDraft();
+    setShowDraftModal(false);
+  }, [clearDraft]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -141,6 +172,7 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
         cleanerData.Email = formData.email;
       }
 
+      clearDraft();
       await onSave(cleanerData);
     } catch (error) {
       console.error('Failed to save cleaner:', error);
@@ -192,7 +224,15 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <>
+      <DraftRestoreModal
+        isOpen={showDraftModal}
+        entityType="cleaner"
+        onRestore={handleRestoreDraft}
+        onDiscard={handleDiscardDraft}
+      />
+
+      <form onSubmit={handleSubmit} className="space-y-6">
       {/* Contact Information */}
       <div className="bg-white p-6 rounded-lg border border-gray-200 space-y-4">
         <h3 className="font-semibold text-lg">Contact Information</h3>
@@ -245,12 +285,14 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Address
           </label>
-          <input
-            type="text"
+          <AddressAutocomplete
             value={formData.address}
-            onChange={(e) => handleChange('address', e.target.value)}
-            placeholder="123 Main St, Manhattan Beach, CA 90266"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            onChange={(address) => handleChange('address', address)}
+            onAddressSelect={(components) => {
+              // For cleaners, we store the full formatted address
+              handleChange('address', components.fullAddress);
+            }}
+            placeholder="Start typing address..."
           />
         </div>
 
@@ -506,5 +548,6 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
         </button>
       </div>
     </form>
+    </>
   );
 }

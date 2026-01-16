@@ -1,20 +1,32 @@
 import Link from 'next/link';
-import { Briefcase, Users, UserCheck, DollarSign, Plus, UserPlus, Sparkles } from 'lucide-react';
-import { getDashboardMetrics, getUpcomingJobs, getClients, getCleaners } from '@/lib/airtable';
+import { Briefcase, Users, UserCheck, DollarSign, Plus, UserPlus, Sparkles, AlertTriangle } from 'lucide-react';
+import { getDashboardMetrics, getUpcomingJobs, getClients, getCleaners, getJobs } from '@/lib/airtable';
 import { UpcomingJobsTable } from '@/components/UpcomingJobsTable';
 
 export default async function WorkingDashboardPage() {
   try {
-    const [metrics, upcomingJobs, clients, cleaners] = await Promise.all([
+    const [metrics, upcomingJobs, clients, cleaners, allJobs] = await Promise.all([
       getDashboardMetrics(),
       getUpcomingJobs(),
       getClients(),
       getCleaners(),
+      getJobs(),
     ]);
 
     // Create lookup maps for client and cleaner names
     const clientMap = new Map(clients.map(c => [c.id, c.fields.Name]));
     const cleanerMap = new Map(cleaners.map(c => [c.id, c.fields.Name]));
+
+    // Calculate urgent matters
+    const activeClients = clients.filter(c => c.fields.Status === 'Active' || !c.fields.Status);
+    const clientsWithoutCleaner = activeClients.filter(c => !c.fields['Preferred Cleaner']?.length);
+    const unassignedJobs = upcomingJobs.filter(j => !j.fields.Cleaner?.length);
+    const completedUnpaidJobs = allJobs.filter(j =>
+      j.fields.Status === 'Completed' &&
+      j.fields['Payment Status'] !== 'Paid'
+    );
+
+    const hasUrgentMatters = clientsWithoutCleaner.length > 0 || unassignedJobs.length > 0 || completedUnpaidJobs.length > 0;
 
     const formatCurrency = (amount: number) => {
       return new Intl.NumberFormat('en-US', {
@@ -131,6 +143,42 @@ export default async function WorkingDashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Urgent Matters Box */}
+        {hasUrgentMatters && (
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle className="h-5 w-5 text-orange-600" />
+              <h2 className="text-lg font-semibold text-orange-800">Needs Attention</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {clientsWithoutCleaner.length > 0 && (
+                <Link href="/clients?filter=unassigned" className="block">
+                  <div className="bg-white p-3 rounded-lg border border-orange-200 hover:border-orange-400 transition-colors">
+                    <p className="text-2xl font-bold text-orange-600">{clientsWithoutCleaner.length}</p>
+                    <p className="text-sm text-orange-800">Clients need cleaner assigned</p>
+                  </div>
+                </Link>
+              )}
+              {unassignedJobs.length > 0 && (
+                <Link href="/jobs?filter=unassigned" className="block">
+                  <div className="bg-white p-3 rounded-lg border border-orange-200 hover:border-orange-400 transition-colors">
+                    <p className="text-2xl font-bold text-orange-600">{unassignedJobs.length}</p>
+                    <p className="text-sm text-orange-800">Upcoming jobs unassigned</p>
+                  </div>
+                </Link>
+              )}
+              {completedUnpaidJobs.length > 0 && (
+                <Link href="/jobs?filter=completed" className="block">
+                  <div className="bg-white p-3 rounded-lg border border-red-200 hover:border-red-400 transition-colors">
+                    <p className="text-2xl font-bold text-red-600">{completedUnpaidJobs.length}</p>
+                    <p className="text-sm text-red-800">Completed jobs awaiting payment</p>
+                  </div>
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Upcoming Jobs Table */}
         <div>

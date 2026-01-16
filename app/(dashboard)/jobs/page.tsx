@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { DataTable, Column } from '@/components/DataTable';
-import { StatusBadge } from '@/components/StatusBadge';
+import { QuickStatusSelect } from '@/components/QuickStatusSelect';
 import { MarkPaidButton } from '@/components/MarkPaidButton';
 import { Job } from '@/types/airtable';
 import { format, parseISO } from 'date-fns';
@@ -31,6 +31,7 @@ export default function JobsPage() {
   const [jobs, setJobs] = useState<EnrichedJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('date-desc');
 
   const fetchJobs = async () => {
     try {
@@ -59,7 +60,7 @@ export default function JobsPage() {
     {
       key: 'Date',
       label: 'Date',
-      render: (job) => job.fields.Date ? format(parseDate(job.fields.Date), 'MMM d, yyyy') : '-',
+      render: (job) => job.fields.Date ? format(parseDate(job.fields.Date), 'MM-dd-yyyy') : '-',
     },
     {
       key: 'Time',
@@ -98,7 +99,15 @@ export default function JobsPage() {
     {
       key: 'Status',
       label: 'Status',
-      render: (job) => <StatusBadge status={job.fields.Status} />,
+      render: (job) => (
+        <QuickStatusSelect
+          recordId={job.id}
+          currentStatus={job.fields.Status || 'Pending'}
+          statusType="job"
+          apiEndpoint="/api/jobs"
+          onSuccess={fetchJobs}
+        />
+      ),
     },
     {
       key: 'Amount',
@@ -141,13 +150,36 @@ export default function JobsPage() {
     },
   ];
 
-  const filteredJobs = jobs.filter((job) => {
-    if (filter === 'unassigned') return !job.fields.Cleaner;
-    if (filter === 'pending') return job.fields.Status === 'Pending';
-    if (filter === 'scheduled') return job.fields.Status === 'Scheduled';
-    if (filter === 'completed') return job.fields.Status === 'Completed';
-    return true; // 'all'
-  });
+  const filteredJobs = jobs
+    .filter((job) => {
+      if (filter === 'unassigned') return !job.fields.Cleaner?.length;
+      if (filter === 'pending') return job.fields.Status === 'Pending';
+      if (filter === 'scheduled') return job.fields.Status === 'Scheduled';
+      if (filter === 'completed') return job.fields.Status === 'Completed';
+      return true; // 'all'
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'date-desc':
+          const dateA = a.fields.Date ? parseDate(a.fields.Date).getTime() : 0;
+          const dateB = b.fields.Date ? parseDate(b.fields.Date).getTime() : 0;
+          return dateB - dateA;
+        case 'date-asc':
+          const dateA2 = a.fields.Date ? parseDate(a.fields.Date).getTime() : 0;
+          const dateB2 = b.fields.Date ? parseDate(b.fields.Date).getTime() : 0;
+          return dateA2 - dateB2;
+        case 'client-asc':
+          return (a.clientName || '').localeCompare(b.clientName || '');
+        case 'client-desc':
+          return (b.clientName || '').localeCompare(a.clientName || '');
+        case 'amount-high':
+          return (b.fields['Amount Charged'] || 0) - (a.fields['Amount Charged'] || 0);
+        case 'amount-low':
+          return (a.fields['Amount Charged'] || 0) - (b.fields['Amount Charged'] || 0);
+        default:
+          return 0;
+      }
+    });
 
   if (loading) {
     return <div className="text-center py-12">Loading...</div>;
@@ -169,21 +201,43 @@ export default function JobsPage() {
         }
       />
 
-      {/* Filters */}
-      <div className="flex space-x-2">
-        {['all', 'unassigned', 'pending', 'scheduled', 'completed'].map((filterOption) => (
-          <button
-            key={filterOption}
-            onClick={() => setFilter(filterOption)}
-            className={`px-3 py-2 text-sm font-medium rounded-md ${
-              filter === filterOption
-                ? 'bg-primary-600 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-            }`}
+      {/* Filters Row */}
+      <div className="flex flex-wrap items-center gap-4">
+        {/* Status Filters */}
+        <div className="flex space-x-2">
+          {['all', 'unassigned', 'pending', 'scheduled', 'completed'].map((filterOption) => (
+            <button
+              key={filterOption}
+              onClick={() => setFilter(filterOption)}
+              className={`px-3 py-2 text-sm font-medium rounded-md ${
+                filter === filterOption
+                  ? filterOption === 'unassigned' ? 'bg-orange-500 text-white' : 'bg-primary-600 text-white'
+                  : filterOption === 'unassigned'
+                    ? 'bg-white text-orange-600 hover:bg-orange-50 border border-orange-300'
+                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+              }`}
+            >
+              {filterOption.charAt(0).toUpperCase() + filterOption.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        {/* Sort */}
+        <div className="flex items-center gap-2 ml-auto">
+          <label className="text-sm text-gray-600">Sort:</label>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white"
           >
-            {filterOption.charAt(0).toUpperCase() + filterOption.slice(1)}
-          </button>
-        ))}
+            <option value="date-desc">Date (Newest)</option>
+            <option value="date-asc">Date (Oldest)</option>
+            <option value="client-asc">Client (A-Z)</option>
+            <option value="client-desc">Client (Z-A)</option>
+            <option value="amount-high">Amount (High-Low)</option>
+            <option value="amount-low">Amount (Low-High)</option>
+          </select>
+        </div>
       </div>
 
       <DataTable

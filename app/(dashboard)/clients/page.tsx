@@ -1,34 +1,47 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { DataTable, Column } from '@/components/DataTable';
-import { StatusBadge } from '@/components/StatusBadge';
-import { Client } from '@/types/airtable';
+import { QuickStatusSelect } from '@/components/QuickStatusSelect';
+import { Client, Cleaner } from '@/types/airtable';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
+  const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('name-asc');
+  const [cleanerFilter, setCleanerFilter] = useState<string>('all');
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [clientsRes, cleanersRes] = await Promise.all([
+        fetch('/api/clients'),
+        fetch('/api/cleaners'),
+      ]);
+      const [clientsData, cleanersData] = await Promise.all([
+        clientsRes.json(),
+        cleanersRes.json(),
+      ]);
+      setClients(clientsData);
+      setCleaners(cleanersData);
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    async function fetchClients() {
-      try {
-        const response = await fetch('/api/clients');
-        const data = await response.json();
-        setClients(data);
-      } catch (error) {
-        console.error('Failed to fetch clients:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
+    fetchData();
+  }, [fetchData]);
 
-    fetchClients();
-  }, []);
+  // Create lookup map for cleaner names
+  const cleanerMap = new Map(cleaners.map(c => [c.id, c.fields.Name]));
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -54,8 +67,19 @@ export default function ClientsPage() {
       render: (client) => client.fields.Phone || '-',
     },
     {
+      key: 'Preferred Cleaner',
+      label: 'Cleaner',
+      render: (client) => {
+        const cleanerId = client.fields['Preferred Cleaner']?.[0];
+        if (!cleanerId) {
+          return <span className="text-orange-600 font-medium">Assign cleaner</span>;
+        }
+        return cleanerMap.get(cleanerId) || '-';
+      },
+    },
+    {
       key: 'Total Bookings',
-      label: 'Total Bookings',
+      label: 'Bookings',
       render: (client) => client.fields['Total Bookings'] || 0,
     },
     {
@@ -78,16 +102,56 @@ export default function ClientsPage() {
     {
       key: 'Status',
       label: 'Status',
-      render: (client) => <StatusBadge status={client.fields.Status || 'Active'} />,
+      render: (client) => (
+        <QuickStatusSelect
+          recordId={client.id}
+          currentStatus={client.fields.Status || 'Active'}
+          statusType="client"
+          apiEndpoint="/api/clients"
+          onSuccess={fetchData}
+        />
+      ),
     },
   ];
 
-  const filteredClients = clients.filter((client) => {
-    if (filter === 'active') return client.fields.Status === 'Active' || !client.fields.Status;
-    if (filter === 'inactive') return client.fields.Status === 'Inactive';
-    if (filter === 'churned') return client.fields.Status === 'Churned';
-    return true; // 'all'
-  });
+  // Filter clients
+  const filteredClients = clients
+    .filter((client) => {
+      // Status filter
+      if (filter === 'active') return client.fields.Status === 'Active' || !client.fields.Status;
+      if (filter === 'inactive') return client.fields.Status === 'Inactive';
+      if (filter === 'churned') return client.fields.Status === 'Churned';
+      return true; // 'all'
+    })
+    .filter((client) => {
+      // Cleaner filter
+      if (cleanerFilter === 'all') return true;
+      if (cleanerFilter === 'unassigned') return !client.fields['Preferred Cleaner']?.length;
+      return client.fields['Preferred Cleaner']?.[0] === cleanerFilter;
+    })
+    .sort((a, b) => {
+      // Sort logic
+      switch (sortBy) {
+        case 'name-asc':
+          return (a.fields.Name || '').localeCompare(b.fields.Name || '');
+        case 'name-desc':
+          return (b.fields.Name || '').localeCompare(a.fields.Name || '');
+        case 'ltv-high':
+          return (b.fields['Total Lifetime Value'] || 0) - (a.fields['Total Lifetime Value'] || 0);
+        case 'ltv-low':
+          return (a.fields['Total Lifetime Value'] || 0) - (b.fields['Total Lifetime Value'] || 0);
+        case 'recent':
+          const dateA = a.fields['Last Booking Date'] ? new Date(a.fields['Last Booking Date']).getTime() : 0;
+          const dateB = b.fields['Last Booking Date'] ? new Date(b.fields['Last Booking Date']).getTime() : 0;
+          return dateB - dateA;
+        case 'oldest':
+          const dateA2 = a.fields['Last Booking Date'] ? new Date(a.fields['Last Booking Date']).getTime() : 0;
+          const dateB2 = b.fields['Last Booking Date'] ? new Date(b.fields['Last Booking Date']).getTime() : 0;
+          return dateA2 - dateB2;
+        default:
+          return 0;
+      }
+    });
 
   if (loading) {
     return <div className="text-center py-12">Loading...</div>;
@@ -109,21 +173,86 @@ export default function ClientsPage() {
         }
       />
 
-      {/* Filters */}
-      <div className="flex space-x-2">
-        {['all', 'active', 'inactive', 'churned'].map((filterOption) => (
+      {/* Filters Row */}
+      <div className="flex flex-wrap items-center gap-4">
+        {/* Status Filters */}
+        <div className="flex space-x-2">
           <button
-            key={filterOption}
-            onClick={() => setFilter(filterOption)}
+            onClick={() => setFilter('all')}
             className={`px-3 py-2 text-sm font-medium rounded-md ${
-              filter === filterOption
+              filter === 'all'
                 ? 'bg-primary-600 text-white'
                 : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
             }`}
           >
-            {filterOption.charAt(0).toUpperCase() + filterOption.slice(1)}
+            All
           </button>
-        ))}
+          <button
+            onClick={() => setFilter('active')}
+            className={`px-3 py-2 text-sm font-medium rounded-md ${
+              filter === 'active'
+                ? 'bg-green-600 text-white'
+                : 'bg-white text-green-700 hover:bg-green-50 border border-green-300'
+            }`}
+          >
+            Active
+          </button>
+          <button
+            onClick={() => setFilter('inactive')}
+            className={`px-3 py-2 text-sm font-medium rounded-md ${
+              filter === 'inactive'
+                ? 'bg-orange-500 text-white'
+                : 'bg-white text-orange-600 hover:bg-orange-50 border border-orange-300'
+            }`}
+          >
+            Inactive
+          </button>
+          <button
+            onClick={() => setFilter('churned')}
+            className={`px-3 py-2 text-sm font-medium rounded-md ${
+              filter === 'churned'
+                ? 'bg-red-600 text-white'
+                : 'bg-white text-red-600 hover:bg-red-50 border border-red-300'
+            }`}
+          >
+            Churned
+          </button>
+        </div>
+
+        {/* Cleaner Filter */}
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-gray-600">Cleaner:</label>
+          <select
+            value={cleanerFilter}
+            onChange={(e) => setCleanerFilter(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white"
+          >
+            <option value="all">All Cleaners</option>
+            <option value="unassigned">Unassigned</option>
+            {cleaners.filter(c => c.fields.Status === 'Active').map(cleaner => (
+              <option key={cleaner.id} value={cleaner.id}>
+                {cleaner.fields.Name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Sort */}
+        <div className="flex items-center gap-2 ml-auto">
+          <label className="text-sm text-gray-600">Sort:</label>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white"
+          >
+            <option value="name-asc">Name (A-Z)</option>
+            <option value="name-desc">Name (Z-A)</option>
+            <option value="ltv-high">LTV (High-Low)</option>
+            <option value="ltv-low">LTV (Low-High)</option>
+            <option value="recent">Recent Activity</option>
+            <option value="oldest">Oldest Activity</option>
+          </select>
+        </div>
       </div>
 
       <DataTable

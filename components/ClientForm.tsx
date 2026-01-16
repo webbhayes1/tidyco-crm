@@ -1,12 +1,45 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import type { Client, Cleaner } from '@/types/airtable';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import type { Client, Cleaner, Team } from '@/types/airtable';
+import { ScheduleSyncModal } from './ScheduleSyncModal';
+import { AddressAutocomplete } from './AddressAutocomplete';
+import { DraftRestoreModal } from './DraftRestoreModal';
+import { useDraftSave } from '@/hooks/useDraftSave';
 
 interface ClientFormProps {
   client?: Client;
   onSave: (data: Partial<Client['fields']>) => Promise<void>;
   onCancel: () => void;
+}
+
+// Helper to compare schedule fields
+function hasScheduleChanged(
+  original: {
+    recurringDays: string[];
+    recurringStartTime: string;
+    recurringEndTime: string;
+    recurrenceFrequency: string;
+    preferredCleaner: string;
+  },
+  current: {
+    recurringDays: string[];
+    recurringStartTime: string;
+    recurringEndTime: string;
+    recurrenceFrequency: string;
+    preferredCleaner: string;
+  }
+): boolean {
+  // Compare recurring days
+  if (original.recurringDays.join(',') !== current.recurringDays.join(',')) return true;
+  // Compare times
+  if (original.recurringStartTime !== current.recurringStartTime) return true;
+  if (original.recurringEndTime !== current.recurringEndTime) return true;
+  // Compare frequency
+  if (original.recurrenceFrequency !== current.recurrenceFrequency) return true;
+  // Compare cleaner
+  if (original.preferredCleaner !== current.preferredCleaner) return true;
+  return false;
 }
 
 // Days of the week
@@ -59,14 +92,34 @@ function formatPhoneNumber(value: string): string {
 export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
   const [loading, setLoading] = useState(false);
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
 
-  // Fetch cleaners for dropdown
+  // Schedule sync modal state
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [futureJobsCount, setFutureJobsCount] = useState(0);
+  const [syncMode, setSyncMode] = useState<'sync' | 'generate'>('sync');
+
+  // Track original schedule values for comparison (only for existing clients)
+  const originalScheduleRef = useRef({
+    recurringDays: client?.fields['Recurring Days']?.split(', ') || [],
+    recurringStartTime: client?.fields['Recurring Start Time'] || '8:00 AM',
+    recurringEndTime: client?.fields['Recurring End Time'] || '11:00 AM',
+    recurrenceFrequency: client?.fields['Recurrence Frequency'] || '',
+    preferredCleaner: client?.fields['Preferred Cleaner']?.[0] || '',
+  });
+
+  // Fetch cleaners and teams for dropdown
   useEffect(() => {
-    fetch('/api/cleaners')
-      .then(r => r.json())
-      .then(data => setCleaners(data.filter((c: Cleaner) => c.fields.Status === 'Active')))
-      .catch(err => console.error('Failed to load cleaners:', err));
+    Promise.all([
+      fetch('/api/cleaners').then(r => r.json()),
+      fetch('/api/teams').then(r => r.json()),
+    ])
+      .then(([cleanersData, teamsData]) => {
+        setCleaners(cleanersData.filter((c: Cleaner) => c.fields.Status === 'Active'));
+        setTeams(teamsData.filter((t: Team) => t.fields.Status === 'Active'));
+      })
+      .catch(err => console.error('Failed to load cleaners/teams:', err));
   }, []);
 
   // Helper to parse existing name into first/last
@@ -95,6 +148,7 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
     email: client?.fields.Email || '',
     phone: client?.fields.Phone || '',
     address: client?.fields.Address || '',
+    addressLine2: client?.fields['Address Line 2'] || '',
     city: client?.fields.City || '',
     state: client?.fields.State || 'CA',
     zipCode: client?.fields['Zip Code'] || '',
@@ -120,80 +174,176 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
     notes: client?.fields.Notes || '',
   });
 
+  // Draft save functionality - only for new clients
+  const draftKey = client?.id ? `client-${client.id}` : 'new-client';
+  const { hasDraft, draftData, clearDraft } = useDraftSave({
+    key: draftKey,
+    data: formData,
+    enabled: !client, // Only save drafts for new clients
+  });
+
+  const [showDraftModal, setShowDraftModal] = useState(false);
+
+  // Check for draft on mount
+  useEffect(() => {
+    if (hasDraft && draftData && !client) {
+      setShowDraftModal(true);
+    }
+  }, [hasDraft, draftData, client]);
+
+  // Restore draft data
+  const handleRestoreDraft = useCallback(() => {
+    if (draftData) {
+      setFormData(draftData as typeof formData);
+    }
+    setShowDraftModal(false);
+  }, [draftData]);
+
+  // Discard draft
+  const handleDiscardDraft = useCallback(() => {
+    clearDraft();
+    setShowDraftModal(false);
+  }, [clearDraft]);
+
+  // Build client data from form
+  const buildClientData = (): Partial<Client['fields']> => {
+    const fullName = formData.lastName
+      ? `${formData.firstName} ${formData.lastName}`.trim()
+      : formData.firstName.trim();
+
+    const clientData: Partial<Client['fields']> = {
+      Name: fullName,
+      'First Name': formData.firstName.trim(),
+      'Last Name': formData.lastName.trim() || undefined,
+      Email: formData.email,
+      Phone: formData.phone,
+      Address: formData.address,
+      'Address Line 2': formData.addressLine2 || undefined,
+      City: formData.city,
+      State: formData.state,
+      'Zip Code': formData.zipCode,
+      Status: formData.status as Client['fields']['Status'],
+      Notes: formData.notes,
+      Preferences: formData.preferences,
+      'Entry Instructions': formData.entryInstructions,
+    };
+
+    if (formData.owner) {
+      clientData.Owner = formData.owner as 'Sean' | 'Webb';
+    }
+    if (formData.preferredCleaner) {
+      clientData['Preferred Cleaner'] = [formData.preferredCleaner];
+    }
+    if (formData.leadSource) {
+      clientData['Lead Source'] = formData.leadSource as Client['fields']['Lead Source'];
+    }
+    if (formData.preferredPaymentMethod) {
+      clientData['Preferred Payment Method'] = formData.preferredPaymentMethod as Client['fields']['Preferred Payment Method'];
+    }
+
+    clientData['Pricing Type'] = formData.pricingType as Client['fields']['Pricing Type'];
+    if (formData.pricingType === 'Hourly Rate') {
+      clientData['Client Hourly Rate'] = formData.clientHourlyRate;
+    } else {
+      clientData['Charge Per Cleaning'] = formData.chargePerCleaning;
+    }
+
+    clientData['Bedrooms'] = formData.bedrooms;
+    clientData['Bathrooms'] = formData.bathrooms;
+
+    clientData['Is Recurring'] = formData.isRecurring;
+    if (formData.isRecurring) {
+      if (formData.recurrenceFrequency) {
+        clientData['Recurrence Frequency'] = formData.recurrenceFrequency as Client['fields']['Recurrence Frequency'];
+      }
+      if (formData.recurringDays.length > 0) {
+        clientData['Recurring Days'] = formData.recurringDays.join(', ');
+        clientData['Recurring Day'] = formData.recurringDays[0] as Client['fields']['Recurring Day'];
+      }
+      if (formData.recurringStartTime) {
+        clientData['Recurring Start Time'] = formData.recurringStartTime;
+      }
+      if (formData.recurringEndTime) {
+        clientData['Recurring End Time'] = formData.recurringEndTime;
+      }
+      if (formData.firstCleaningDate) {
+        clientData['First Cleaning Date'] = formData.firstCleaningDate;
+      }
+    }
+
+    return clientData;
+  };
+
+  // Sync or generate jobs with schedule
+  const syncJobsWithSchedule = async () => {
+    if (!client?.id) return;
+
+    try {
+      await fetch(`/api/clients/${client.id}/sync-jobs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recurringDays: formData.recurringDays,
+          recurringStartTime: formData.recurringStartTime,
+          recurringEndTime: formData.recurringEndTime,
+          preferredCleaner: formData.preferredCleaner ? [formData.preferredCleaner] : [],
+          frequency: formData.recurrenceFrequency,
+          mode: syncMode, // 'sync' or 'generate'
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to sync jobs:', error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Combine first and last name into full name
-      const fullName = formData.lastName
-        ? `${formData.firstName} ${formData.lastName}`.trim()
-        : formData.firstName.trim();
+      const clientData = buildClientData();
 
-      const clientData: Partial<Client['fields']> = {
-        Name: fullName,
-        'First Name': formData.firstName.trim(),
-        'Last Name': formData.lastName.trim() || undefined,
-        Email: formData.email,
-        Phone: formData.phone,
-        Address: formData.address,
-        City: formData.city,
-        State: formData.state,
-        'Zip Code': formData.zipCode,
-        Status: formData.status as Client['fields']['Status'],
-        Notes: formData.notes,
-        Preferences: formData.preferences,
-        'Entry Instructions': formData.entryInstructions,
-      };
+      // Check if this is an existing client and schedule has changed
+      if (client?.id && formData.isRecurring) {
+        const currentSchedule = {
+          recurringDays: formData.recurringDays,
+          recurringStartTime: formData.recurringStartTime,
+          recurringEndTime: formData.recurringEndTime,
+          recurrenceFrequency: formData.recurrenceFrequency,
+          preferredCleaner: formData.preferredCleaner,
+        };
 
-      // Only add optional fields if they have values
-      if (formData.owner) {
-        clientData.Owner = formData.owner as 'Sean' | 'Webb';
-      }
-      if (formData.preferredCleaner) {
-        clientData['Preferred Cleaner'] = [formData.preferredCleaner];
-      }
-      if (formData.leadSource) {
-        clientData['Lead Source'] = formData.leadSource as Client['fields']['Lead Source'];
-      }
-      if (formData.preferredPaymentMethod) {
-        clientData['Preferred Payment Method'] = formData.preferredPaymentMethod as Client['fields']['Preferred Payment Method'];
-      }
+        if (hasScheduleChanged(originalScheduleRef.current, currentSchedule)) {
+          // Check how many future jobs exist
+          const response = await fetch(`/api/clients/${client.id}/sync-jobs`);
+          const data = await response.json();
 
-      // Pricing fields
-      clientData['Pricing Type'] = formData.pricingType as Client['fields']['Pricing Type'];
-      if (formData.pricingType === 'Hourly Rate') {
-        clientData['Client Hourly Rate'] = formData.clientHourlyRate;
-      } else {
-        clientData['Charge Per Cleaning'] = formData.chargePerCleaning;
-      }
+          // Save client data directly via API (don't use onSave which navigates)
+          await fetch(`/api/clients/${client.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(clientData),
+          });
 
-      // Property details
-      clientData['Bedrooms'] = formData.bedrooms;
-      clientData['Bathrooms'] = formData.bathrooms;
-
-      // Recurring fields
-      clientData['Is Recurring'] = formData.isRecurring;
-      if (formData.isRecurring) {
-        if (formData.recurrenceFrequency) {
-          clientData['Recurrence Frequency'] = formData.recurrenceFrequency as Client['fields']['Recurrence Frequency'];
-        }
-        if (formData.recurringDays.length > 0) {
-          clientData['Recurring Days'] = formData.recurringDays.join(', ');
-          // Also set the first day as the primary recurring day for backwards compatibility
-          clientData['Recurring Day'] = formData.recurringDays[0] as Client['fields']['Recurring Day'];
-        }
-        if (formData.recurringStartTime) {
-          clientData['Recurring Start Time'] = formData.recurringStartTime;
-        }
-        if (formData.recurringEndTime) {
-          clientData['Recurring End Time'] = formData.recurringEndTime;
-        }
-        if (formData.firstCleaningDate) {
-          clientData['First Cleaning Date'] = formData.firstCleaningDate;
+          if (data.count > 0) {
+            // Has future jobs - offer to sync them
+            setSyncMode('sync');
+            setFutureJobsCount(data.count);
+            setShowSyncModal(true);
+            setLoading(false);
+            return;
+          } else if (formData.recurringDays.length > 0) {
+            // No future jobs but has recurring schedule - offer to generate
+            setSyncMode('generate');
+            setFutureJobsCount(0);
+            setShowSyncModal(true);
+            setLoading(false);
+            return;
+          }
         }
       }
 
+      clearDraft(); // Clear draft on successful save
       await onSave(clientData);
     } catch (error) {
       console.error('Failed to save client:', error);
@@ -219,7 +369,16 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <>
+      {/* Draft Restore Modal */}
+      <DraftRestoreModal
+        isOpen={showDraftModal}
+        entityType="client"
+        onRestore={handleRestoreDraft}
+        onDiscard={handleDiscardDraft}
+      />
+
+      <form onSubmit={handleSubmit} className="space-y-6">
       {/* Contact Information */}
       <div className="bg-white p-6 rounded-lg border border-gray-200 space-y-4">
         <h3 className="font-semibold text-lg">Contact Information</h3>
@@ -292,12 +451,29 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Street Address *
           </label>
+          <AddressAutocomplete
+            value={formData.address}
+            onChange={(address) => handleChange('address', address)}
+            onAddressSelect={(components) => {
+              // Auto-fill city, state, zip from Google Places
+              if (components.city) handleChange('city', components.city);
+              if (components.state) handleChange('state', components.state);
+              if (components.zipCode) handleChange('zipCode', components.zipCode);
+            }}
+            placeholder="Start typing address..."
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Apt / Unit / Suite
+          </label>
           <input
             type="text"
-            required
-            value={formData.address}
-            onChange={(e) => handleChange('address', e.target.value)}
-            placeholder="123 Main St, Manhattan Beach, CA"
+            value={formData.addressLine2}
+            onChange={(e) => handleChange('addressLine2', e.target.value)}
+            placeholder="Apt 2B, Unit 101, etc."
             className="w-full px-3 py-2 border border-gray-300 rounded-lg"
           />
         </div>
@@ -427,19 +603,30 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Preferred Cleaner
+              Preferred Cleaner / Team
             </label>
             <select
               value={formData.preferredCleaner}
               onChange={(e) => handleChange('preferredCleaner', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
             >
-              <option value="">Select cleaner...</option>
-              {cleaners.map(cleaner => (
-                <option key={cleaner.id} value={cleaner.id}>
-                  {cleaner.fields.Name}
-                </option>
-              ))}
+              <option value="">Select cleaner or team...</option>
+              {teams.length > 0 && (
+                <optgroup label="Teams">
+                  {teams.map(team => (
+                    <option key={team.id} value={team.id}>
+                      {team.fields['Team Name']} ({team.fields['Member Count'] || 0} members)
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label="Individual Cleaners">
+                {cleaners.map(cleaner => (
+                  <option key={cleaner.id} value={cleaner.id}>
+                    {cleaner.fields.Name}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </div>
         </div>
@@ -604,14 +791,11 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
                 className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg"
               >
                 <option value="">Select frequency...</option>
-                <option value="Daily">Daily (Select days below)</option>
                 <option value="Weekly">Weekly</option>
                 <option value="Bi-weekly">Bi-weekly (Every 2 weeks)</option>
                 <option value="Monthly">Monthly</option>
               </select>
-              {formData.recurrenceFrequency === 'Daily' && (
-                <p className="text-xs text-gray-500 mt-1">Select specific days of the week below for recurring cleanings</p>
-              )}
+              <p className="text-xs text-gray-500 mt-1">Select specific days of the week below for recurring cleanings</p>
             </div>
 
             {/* Days of Week - Multi-select */}
@@ -760,6 +944,29 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
           {loading ? 'Saving...' : client ? 'Update Client' : 'Create Client'}
         </button>
       </div>
+
+      {/* Schedule Sync Modal */}
+      <ScheduleSyncModal
+        isOpen={showSyncModal}
+        onClose={() => {
+          setShowSyncModal(false);
+          // Navigate back after modal closes
+          if (client?.id) {
+            window.location.href = `/clients/${client.id}`;
+          }
+        }}
+        onConfirm={async () => {
+          await syncJobsWithSchedule();
+          // Navigate back after sync completes
+          if (client?.id) {
+            window.location.href = `/clients/${client.id}`;
+          }
+        }}
+        futureJobsCount={futureJobsCount}
+        clientName={formData.firstName + (formData.lastName ? ' ' + formData.lastName : '')}
+        mode={syncMode}
+      />
     </form>
+    </>
   );
 }

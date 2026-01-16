@@ -413,33 +413,68 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
           </div>
 
           {/* Pricing */}
-          {(client.fields['Pricing Type'] || client.fields['Charge Per Cleaning'] || client.fields['Client Hourly Rate']) && (
-            <div className="bg-white shadow sm:rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
-                <h3 className="text-base font-medium text-gray-900 mb-4 flex items-center gap-2">
-                  <DollarSign className="h-5 w-5 text-green-600" />
-                  Pricing
-                </h3>
-                <div className="bg-green-50 p-3 rounded-lg">
-                  {client.fields['Pricing Type'] === 'Hourly Rate' ? (
-                    <>
-                      <p className="text-sm font-medium text-green-800">Hourly Rate</p>
-                      <p className="text-2xl font-bold text-green-700">
-                        {formatCurrency(client.fields['Client Hourly Rate'] || 0)}/hr
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-sm font-medium text-green-800">Per Cleaning</p>
-                      <p className="text-2xl font-bold text-green-700">
-                        {formatCurrency(client.fields['Charge Per Cleaning'] || 0)}
-                      </p>
-                    </>
-                  )}
+          {(client.fields['Pricing Type'] || client.fields['Charge Per Cleaning'] || client.fields['Client Hourly Rate']) && (() => {
+            // Calculate cleaner pay and profit
+            const preferredCleaner = client.fields['Preferred Cleaner']?.[0]
+              ? cleaners.find(c => c.id === client.fields['Preferred Cleaner']?.[0])
+              : null;
+            const cleanerHourlyRate = preferredCleaner?.fields['Hourly Rate'] || 0;
+            const clientCharge = client.fields['Pricing Type'] === 'Hourly Rate'
+              ? client.fields['Client Hourly Rate'] || 0
+              : client.fields['Charge Per Cleaning'] || 0;
+            const isHourly = client.fields['Pricing Type'] === 'Hourly Rate';
+            // Estimate 3 hours for per-cleaning rate profit calculation
+            const estimatedHours = 3;
+            const cleanerPay = isHourly ? cleanerHourlyRate : cleanerHourlyRate * estimatedHours;
+            const profit = isHourly ? (clientCharge - cleanerHourlyRate) : (clientCharge - cleanerPay);
+
+            return (
+              <div className="bg-white shadow sm:rounded-lg">
+                <div className="px-4 py-5 sm:p-6">
+                  <h3 className="text-base font-medium text-gray-900 mb-4 flex items-center gap-2">
+                    <DollarSign className="h-5 w-5 text-green-600" />
+                    Pricing
+                  </h3>
+                  <div className="space-y-3">
+                    {/* Profit - Main highlight */}
+                    {preferredCleaner && cleanerHourlyRate > 0 ? (
+                      <div className="bg-green-50 p-3 rounded-lg">
+                        <p className="text-sm font-medium text-green-800">
+                          Profit{isHourly ? ' per Hour' : ' per Cleaning'}
+                        </p>
+                        <p className={`text-2xl font-bold ${profit >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                          {formatCurrency(profit)}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <p className="text-sm font-medium text-gray-600">Profit</p>
+                        <p className="text-sm text-gray-500">Assign a cleaner to calculate</p>
+                      </div>
+                    )}
+
+                    {/* Cleaner Pay & Client Charge */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-blue-50 p-3 rounded-lg">
+                        <p className="text-xs font-medium text-blue-800">Cleaner Pay</p>
+                        <p className="text-lg font-bold text-blue-700">
+                          {preferredCleaner && cleanerHourlyRate > 0
+                            ? `${formatCurrency(cleanerHourlyRate)}/hr`
+                            : '-'}
+                        </p>
+                      </div>
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <p className="text-xs font-medium text-gray-700">Client Charge</p>
+                        <p className="text-lg font-bold text-gray-900">
+                          {formatCurrency(clientCharge)}{isHourly ? '/hr' : ''}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Client Status */}
           <div className="bg-white shadow sm:rounded-lg">

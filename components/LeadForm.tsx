@@ -1,7 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Lead } from '@/types/airtable';
+import { AddressAutocomplete } from './AddressAutocomplete';
+import { DraftRestoreModal } from './DraftRestoreModal';
+import { useDraftSave } from '@/hooks/useDraftSave';
 
 interface LeadFormProps {
   initialData?: Lead['fields'];
@@ -31,6 +34,34 @@ export function LeadForm({ initialData, onSave, onCancel }: LeadFormProps) {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Draft save functionality - only for new leads
+  const isNewLead = !initialData?.Name;
+  const { hasDraft, draftData, clearDraft } = useDraftSave({
+    key: 'new-lead',
+    data: formData,
+    enabled: isNewLead,
+  });
+
+  const [showDraftModal, setShowDraftModal] = useState(false);
+
+  useEffect(() => {
+    if (hasDraft && draftData && isNewLead) {
+      setShowDraftModal(true);
+    }
+  }, [hasDraft, draftData, isNewLead]);
+
+  const handleRestoreDraft = useCallback(() => {
+    if (draftData) {
+      setFormData(draftData as Lead['fields']);
+    }
+    setShowDraftModal(false);
+  }, [draftData]);
+
+  const handleDiscardDraft = useCallback(() => {
+    clearDraft();
+    setShowDraftModal(false);
+  }, [clearDraft]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -63,6 +94,7 @@ export function LeadForm({ initialData, onSave, onCancel }: LeadFormProps) {
     setError(null);
 
     try {
+      clearDraft();
       await onSave(formData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save lead');
@@ -72,7 +104,15 @@ export function LeadForm({ initialData, onSave, onCancel }: LeadFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <>
+      <DraftRestoreModal
+        isOpen={showDraftModal}
+        entityType="lead"
+        onRestore={handleRestoreDraft}
+        onDiscard={handleDiscardDraft}
+      />
+
+      <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
         <div className="bg-red-50 p-4 rounded-lg border border-red-200">
           <p className="text-red-800">{error}</p>
@@ -194,12 +234,18 @@ export function LeadForm({ initialData, onSave, onCancel }: LeadFormProps) {
               <label htmlFor="Address" className="block text-sm font-medium text-gray-700">
                 Street Address
               </label>
-              <input
-                type="text"
-                id="Address"
-                name="Address"
+              <AddressAutocomplete
                 value={formData.Address || ''}
-                onChange={handleChange}
+                onChange={(address) => setFormData(prev => ({ ...prev, Address: address }))}
+                onAddressSelect={(components) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    City: components.city || prev.City,
+                    State: components.state || prev.State,
+                    'Zip Code': components.zipCode || prev['Zip Code'],
+                  }));
+                }}
+                placeholder="Start typing address..."
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
               />
             </div>
@@ -386,5 +432,6 @@ export function LeadForm({ initialData, onSave, onCancel }: LeadFormProps) {
         </button>
       </div>
     </form>
+    </>
   );
 }
