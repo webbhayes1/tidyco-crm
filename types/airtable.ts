@@ -317,6 +317,7 @@ export interface Team {
 
 export interface Lead {
   id: string;
+  createdTime?: string; // Airtable system field
   fields: {
     'Name': string;
     'Email'?: string;

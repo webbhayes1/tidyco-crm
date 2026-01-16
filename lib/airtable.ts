@@ -53,6 +53,7 @@ const TABLES = {
 function convertRecord<T>(record: Record<FieldSet>): T {
   return {
     id: record.id,
+    createdTime: record._rawJson?.createdTime,
     fields: record.fields,
   } as T;
 }

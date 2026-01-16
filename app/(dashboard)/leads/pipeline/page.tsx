@@ -151,21 +151,17 @@ export default function LeadsPage() {
     return status === filter;
   });
 
-  // Sort by status order, then by created date
+  // Sort by status order, then by Airtable creation time (newest first)
   const sortedLeads = [...filteredLeads].sort((a, b) => {
     const statusA = a.fields.Status || 'New';
     const statusB = b.fields.Status || 'New';
     const orderA = STATUS_ORDER.indexOf(statusA as LeadStatus);
     const orderB = STATUS_ORDER.indexOf(statusB as LeadStatus);
     if (orderA !== orderB) return orderA - orderB;
-    // Secondary sort by created date (newest first)
-    // Leads without dates are treated as newest (appear first)
-    const dateA = a.fields['Created Date'] || '';
-    const dateB = b.fields['Created Date'] || '';
-    if (!dateA && !dateB) return 0;
-    if (!dateA) return -1; // A has no date, put it first
-    if (!dateB) return 1;  // B has no date, put it first
-    return dateB.localeCompare(dateA);
+    // Secondary sort by Airtable createdTime (newest first)
+    const timeA = a.createdTime || '';
+    const timeB = b.createdTime || '';
+    return timeB.localeCompare(timeA);
   });
 
   // Count by status for filter badges
