@@ -99,11 +99,13 @@ function normalizeLeadData(data: Record<string, unknown>): Record<string, unknow
     }
   }
 
-  // Add lead fee info if present
+  // Save lead fee as a proper field (for expense tracking)
   const fee = data.fee;
   if (fee !== undefined && fee !== null) {
-    const feeNote = `Lead Fee: $${fee}`;
-    notes = notes ? `${notes}\n\n${feeNote}` : feeNote;
+    const feeAmount = parseFloat(String(fee));
+    if (!isNaN(feeAmount) && feeAmount > 0) {
+      normalized['Lead Fee'] = feeAmount;
+    }
   }
 
   if (notes) normalized.Notes = String(notes);

@@ -23,6 +23,27 @@ const TIME_OPTIONS = [
   '6:00 PM', '6:30 PM', '7:00 PM', '7:30 PM', '8:00 PM', '8:30 PM', '9:00 PM'
 ];
 
+// Predefined color palette for cleaners (Google Calendar-like colors)
+const CLEANER_COLOR_PALETTE = [
+  { name: 'Blue', hex: '#4285F4' },
+  { name: 'Green', hex: '#0B8043' },
+  { name: 'Yellow', hex: '#F6BF26' },
+  { name: 'Red', hex: '#E67C73' },
+  { name: 'Purple', hex: '#9E69AF' },
+  { name: 'Teal', hex: '#039BE5' },
+  { name: 'Orange', hex: '#F4511E' },
+  { name: 'Pink', hex: '#D81B60' },
+  { name: 'Cyan', hex: '#33B679' },
+  { name: 'Indigo', hex: '#7986CB' },
+  { name: 'Brown', hex: '#8D6E63' },
+  { name: 'Gray', hex: '#616161' },
+];
+
+// Auto-assign a color based on index (for new cleaners)
+function getAutoAssignedColor(index: number): string {
+  return CLEANER_COLOR_PALETTE[index % CLEANER_COLOR_PALETTE.length].hex;
+}
+
 interface DaySchedule {
   enabled: boolean;
   startTime: string;
@@ -108,6 +129,7 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
     birthday: cleaner?.fields.Birthday || '',
     workAnniversary: cleaner?.fields['Work Anniversary'] || '',
     address: cleaner?.fields.Address || '',
+    color: cleaner?.fields.Color || getAutoAssignedColor(Math.floor(Math.random() * CLEANER_COLOR_PALETTE.length)),
   });
 
   const [schedule, setSchedule] = useState<WeekSchedule>(() =>
@@ -165,6 +187,7 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
         Birthday: formData.birthday || undefined,
         'Work Anniversary': formData.workAnniversary || undefined,
         Address: formData.address || undefined,
+        Color: formData.color,
       };
 
       // Only include email if provided
@@ -409,6 +432,28 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
             className="w-full px-3 py-2 border border-gray-300 rounded-lg"
           />
           <p className="text-xs text-gray-500 mt-1">Typical range: $20-30/hr</p>
+        </div>
+
+        {/* Calendar Color */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Calendar Color
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {CLEANER_COLOR_PALETTE.map((color) => (
+              <button
+                key={color.hex}
+                type="button"
+                onClick={() => handleChange('color', color.hex)}
+                className={`w-8 h-8 rounded-lg cursor-pointer transition-all hover:scale-110 hover:ring-2 hover:ring-gray-400 hover:ring-offset-1 ${
+                  formData.color === color.hex ? 'ring-2 ring-gray-900 ring-offset-2' : ''
+                }`}
+                style={{ backgroundColor: color.hex }}
+                title={color.name}
+              />
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-2">This color will be used for their jobs on the calendar</p>
         </div>
       </div>
 

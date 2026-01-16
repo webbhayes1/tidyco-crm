@@ -27,7 +27,9 @@ import {
   Send,
   Users,
   CheckCircle,
-  XCircle
+  XCircle,
+  DollarSign,
+  RotateCcw
 } from 'lucide-react';
 
 export default function LeadDetailPage() {
@@ -634,6 +636,53 @@ export default function LeadDetailPage() {
               </dl>
             </div>
           </div>
+
+          {/* Lead Fee (if exists) */}
+          {lead.fields['Lead Fee'] && lead.fields['Lead Fee'] > 0 && (
+            <div className={`shadow sm:rounded-lg ${lead.fields.Refunded ? 'bg-gray-50' : 'bg-rose-50'}`}>
+              <div className="px-4 py-5 sm:p-6">
+                <h3 className={`text-base font-medium mb-3 flex items-center gap-2 ${lead.fields.Refunded ? 'text-gray-700' : 'text-rose-900'}`}>
+                  <DollarSign className="h-5 w-5" />
+                  Lead Fee
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className={`text-2xl font-bold ${lead.fields.Refunded ? 'text-gray-500 line-through' : 'text-rose-700'}`}>
+                      ${lead.fields['Lead Fee'].toFixed(2)}
+                    </span>
+                    {lead.fields.Refunded && (
+                      <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+                        <RotateCcw className="h-3 w-3 mr-1" />
+                        Refunded
+                      </span>
+                    )}
+                  </div>
+                  {lead.fields.Refunded && lead.fields['Refund Date'] && (
+                    <p className="text-sm text-gray-500">
+                      Refunded on {format(new Date(lead.fields['Refund Date']), 'MMM d, yyyy')}
+                    </p>
+                  )}
+                  {!lead.fields.Refunded && (
+                    <button
+                      onClick={async () => {
+                        if (!confirm('Mark this lead fee as refunded? This will remove it from expense calculations.')) return;
+                        await updateLead({
+                          Refunded: true,
+                          'Refund Date': new Date().toISOString().split('T')[0],
+                        });
+                        await logActivity('Note', `Lead fee of $${lead.fields['Lead Fee']?.toFixed(2)} marked as refunded`);
+                      }}
+                      disabled={updating}
+                      className="w-full inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <RotateCcw className="mr-2 h-4 w-4" />
+                      Mark as Refunded
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Won Reason (if Won) */}
           {lead.fields.Status === 'Won' && lead.fields['Won Reason'] && (

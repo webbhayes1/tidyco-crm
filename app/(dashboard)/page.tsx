@@ -17,8 +17,9 @@ export default async function WorkingDashboardPage() {
     const clientMap = new Map(clients.map(c => [c.id, c.fields.Name]));
     const cleanerMap = new Map(cleaners.map(c => [c.id, c.fields.Name]));
 
-    // Calculate urgent matters
+    // Calculate urgent matters and totals
     const activeClients = clients.filter(c => c.fields.Status === 'Active' || !c.fields.Status);
+    const totalLifetimeValue = activeClients.reduce((sum, c) => sum + (c.fields['Total Lifetime Value'] || 0), 0);
     const clientsWithoutCleaner = activeClients.filter(c => !c.fields['Preferred Cleaner']?.length);
     const unassignedJobs = upcomingJobs.filter(j => !j.fields.Cleaner?.length);
     const completedUnpaidJobs = allJobs.filter(j =>
@@ -121,6 +122,9 @@ export default async function WorkingDashboardPage() {
                   <dd className="mt-1 text-3xl font-semibold tracking-tight text-tidyco-navy">
                     {metrics.activeClientsCount}
                   </dd>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {formatCurrency(totalLifetimeValue)} lifetime
+                  </p>
                 </div>
                 <div className="flex-shrink-0">
                   <Users className="h-8 w-8 text-tidyco-blue" />

@@ -36,13 +36,8 @@ const parseTimeToHour = (timeStr: string): number => {
   return hours + minutes / 60;
 };
 
-const CLEANER_COLORS: Record<string, string> = {
-  'Alice': '#4285F4',
-  'Bob': '#0B8043',
-  'Charlie': '#F6BF26',
-  'Diana': '#E67C73',
-  'Evan': '#9E69AF',
-};
+// Default color for cleaners without assigned color
+const DEFAULT_CLEANER_COLOR = '#6B7280';
 
 export default function CalendarWeeklyPage() {
   const [currentWeek, setCurrentWeek] = useState(new Date());
@@ -123,14 +118,19 @@ export default function CalendarWeeklyPage() {
     return dayJobCount > busiestCount ? day : busiest;
   }, weekDays[0]);
 
-  // Get cleaner color
-  const getCleanerColor = (cleanerName: string): string => {
-    const colors = Object.keys(CLEANER_COLORS);
-    const matchedColor = colors.find(name => cleanerName.includes(name));
-    if (matchedColor) {
-      return CLEANER_COLORS[matchedColor];
+  // Build cleaner color map from cleaner records
+  const cleanerColorMap = new Map<string, string>();
+  cleaners.forEach(cleaner => {
+    cleanerColorMap.set(cleaner.id, cleaner.fields.Color || DEFAULT_CLEANER_COLOR);
+  });
+
+  // Get cleaner color by job's cleaner ID
+  const getCleanerColor = (job: EnrichedJob): string => {
+    const cleanerId = job.fields.Cleaner?.[0];
+    if (cleanerId) {
+      return cleanerColorMap.get(cleanerId) || DEFAULT_CLEANER_COLOR;
     }
-    return '#6B7280';
+    return DEFAULT_CLEANER_COLOR;
   };
 
   // Navigation
@@ -287,7 +287,7 @@ export default function CalendarWeeklyPage() {
                   {/* Jobs - Absolutely Positioned */}
                   {dayJobs.map((job, jobIdx) => {
                     const style = getJobStyle(job);
-                    const color = getCleanerColor(job.cleanerName);
+                    const color = getCleanerColor(job);
                     const startTime = job.fields.Time || '';
                     const endTime = job.fields['End Time'] || '';
 
@@ -347,7 +347,7 @@ export default function CalendarWeeklyPage() {
         <h3 className="font-semibold mb-3">Cleaner Colors</h3>
         <div className="flex flex-wrap gap-4">
           {cleaners.filter(c => c.fields.Status === 'Active').map(cleaner => {
-            const color = getCleanerColor(cleaner.fields.Name || '');
+            const color = cleaner.fields.Color || DEFAULT_CLEANER_COLOR;
             const cleanerJobs = weekJobs.filter(job =>
               job.fields.Cleaner && job.fields.Cleaner[0] === cleaner.id
             );

@@ -14,13 +14,22 @@ interface EnrichedJob extends Job {
 }
 
 const HOURS = Array.from({ length: 13 }, (_, i) => i + 7); // 7am to 7pm
-const CLEANER_COLORS = {
-  'Alice': '#4285F4',
-  'Bob': '#0B8043',
-  'Charlie': '#F6BF26',
-  'Diana': '#E67C73',
-  'Evan': '#9E69AF',
-};
+const DEFAULT_CLEANER_COLOR = '#6B7280';
+
+const CLEANER_COLOR_PALETTE = [
+  { name: 'Blue', hex: '#4285F4' },
+  { name: 'Green', hex: '#0B8043' },
+  { name: 'Yellow', hex: '#F6BF26' },
+  { name: 'Red', hex: '#E67C73' },
+  { name: 'Purple', hex: '#9E69AF' },
+  { name: 'Teal', hex: '#039BE5' },
+  { name: 'Orange', hex: '#F4511E' },
+  { name: 'Pink', hex: '#D81B60' },
+  { name: 'Cyan', hex: '#33B679' },
+  { name: 'Indigo', hex: '#7986CB' },
+  { name: 'Brown', hex: '#8D6E63' },
+  { name: 'Gray', hex: '#616161' },
+];
 
 export default function CalendarDailyPage() {
   const router = useRouter();
@@ -31,6 +40,7 @@ export default function CalendarDailyPage() {
 
   // Filters
   const [showCleaners, setShowCleaners] = useState<Record<string, boolean>>({});
+  const [colorPickerOpen, setColorPickerOpen] = useState<string | null>(null);
   const [showJobTypes, setShowJobTypes] = useState({
     'General Clean': true,
     'Deep Clean': true,
@@ -134,6 +144,31 @@ export default function CalendarDailyPage() {
   const goToNextDay = () => setSelectedDate(addDays(selectedDate, 1));
   const goToToday = () => setSelectedDate(new Date());
 
+  // Update cleaner color
+  const updateCleanerColor = async (cleanerId: string, color: string) => {
+    try {
+      const response = await fetch(`/api/cleaners/${cleanerId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Color: color }),
+      });
+
+      if (response.ok) {
+        // Update local state
+        setCleaners(prev => prev.map(c =>
+          c.id === cleanerId
+            ? { ...c, fields: { ...c.fields, Color: color } }
+            : c
+        ));
+      } else {
+        alert('Failed to update cleaner color. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error updating cleaner color:', error);
+      alert('Failed to update cleaner color. Please try again.');
+    }
+  };
+
   // Parse time string (handles both "10:00 AM" and "14:00" formats)
   const parseTime = (timeStr: string): number => {
     if (!timeStr) return 0;
@@ -172,14 +207,15 @@ export default function CalendarDailyPage() {
     return { left: `${left}%`, width: `${width}%` };
   };
 
-  // Get cleaner color
-  const getCleanerColor = (cleanerName: string): string => {
-    const colors = Object.keys(CLEANER_COLORS);
-    const matchedColor = colors.find(name => cleanerName.includes(name));
-    if (matchedColor) {
-      return CLEANER_COLORS[matchedColor as keyof typeof CLEANER_COLORS];
-    }
-    return '#6B7280'; // Default gray
+  // Build cleaner color map from cleaner records
+  const cleanerColorMap = new Map<string, string>();
+  cleaners.forEach(cleaner => {
+    cleanerColorMap.set(cleaner.id, cleaner.fields.Color || DEFAULT_CLEANER_COLOR);
+  });
+
+  // Get cleaner color by cleaner ID
+  const getCleanerColor = (cleanerId: string): string => {
+    return cleanerColorMap.get(cleanerId) || DEFAULT_CLEANER_COLOR;
   };
 
   if (loading) {
@@ -313,7 +349,7 @@ export default function CalendarDailyPage() {
                     const price = job.fields['Amount Charged'] || 0;
                     const startTime = job.fields.Time;
                     const endTime = job.fields['End Time'];
-                    const color = getCleanerColor(cleanerName);
+                    const color = getCleanerColor(cleaner.id);
 
                     return (
                       <Link
@@ -368,8 +404,10 @@ export default function CalendarDailyPage() {
             <div className="space-y-2">
               {cleaners.map(cleaner => {
                 const todayJobCount = jobsByCleaner.get(cleaner.id)?.length || 0;
+                const currentColor = cleaner.fields.Color || DEFAULT_CLEANER_COLOR;
+                const isOpen = colorPickerOpen === cleaner.id;
                 return (
-                  <label key={cleaner.id} className="flex items-center gap-2 text-sm">
+                  <div key={cleaner.id} className="flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
                       checked={showCleaners[cleaner.id]}
@@ -379,13 +417,47 @@ export default function CalendarDailyPage() {
                       })}
                       className="rounded"
                     />
-                    <span>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setColorPickerOpen(isOpen ? null : cleaner.id)}
+                        className="w-5 h-5 rounded cursor-pointer transition-all hover:ring-2 hover:ring-gray-400 hover:ring-offset-1"
+                        style={{ backgroundColor: currentColor }}
+                        title="Change color"
+                      />
+                      {isOpen && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-10"
+                            onClick={() => setColorPickerOpen(null)}
+                          />
+                          <div className="absolute left-0 top-7 z-20 bg-white rounded-lg shadow-lg border border-gray-200 p-3 grid grid-cols-4 gap-3">
+                            {CLEANER_COLOR_PALETTE.map(color => (
+                              <button
+                                key={color.hex}
+                                type="button"
+                                onClick={() => {
+                                  updateCleanerColor(cleaner.id, color.hex);
+                                  setColorPickerOpen(null);
+                                }}
+                                className={`w-7 h-7 rounded cursor-pointer transition-transform hover:scale-110 ${
+                                  currentColor === color.hex ? 'ring-2 ring-gray-900 ring-offset-2' : ''
+                                }`}
+                                style={{ backgroundColor: color.hex }}
+                                title={color.name}
+                              />
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    <span className="flex-1">
                       {cleaner.fields.Name}
                       <span className="text-gray-500 ml-1">
                         ({todayJobCount} {todayJobCount === 1 ? 'job' : 'jobs'})
                       </span>
                     </span>
-                  </label>
+                  </div>
                 );
               })}
             </div>

@@ -9,13 +9,14 @@ import {
   Gift
 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
-import type { Expense, Job } from '@/types/airtable';
+import type { Expense, Job, Lead } from '@/types/airtable';
 
 type TimePeriod = 'this-month' | 'last-month' | 'this-year' | 'all-time' | 'custom';
 
 export default function FinancesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('this-month');
   const [customStartDate, setCustomStartDate] = useState<string>('');
@@ -25,9 +26,11 @@ export default function FinancesPage() {
     Promise.all([
       fetch('/api/expenses').then(r => r.json()),
       fetch('/api/jobs').then(r => r.json()),
-    ]).then(([expenseData, jobsData]) => {
+      fetch('/api/leads').then(r => r.json()),
+    ]).then(([expenseData, jobsData, leadsData]) => {
       setExpenses(expenseData);
       setJobs(jobsData);
+      setLeads(leadsData);
       setLoading(false);
     }).catch((error) => {
       console.error('Failed to load financial data:', error);
@@ -68,6 +71,18 @@ export default function FinancesPage() {
         return isWithinInterval(date, { start: dateRange.start, end: dateRange.end });
       })
     : jobs;
+
+  // Filter leads by date range (using createdTime or Created Date)
+  // Only include leads with a Lead Fee that haven't been refunded
+  const filteredLeadsWithFees = (dateRange
+    ? leads.filter(l => {
+        const dateStr = l.createdTime || l.fields['Created Date'];
+        if (!dateStr) return false;
+        const date = new Date(dateStr);
+        return isWithinInterval(date, { start: dateRange.start, end: dateRange.end });
+      })
+    : leads
+  ).filter(l => l.fields['Lead Fee'] && l.fields['Lead Fee'] > 0 && !l.fields.Refunded);
 
   // Helper to safely get numeric value (handles arrays from Airtable lookups)
   const safeNumber = (value: number | number[] | undefined | null): number => {
@@ -119,17 +134,26 @@ export default function FinancesPage() {
   const totalTips = filteredJobs.reduce((sum, j) => sum + safeNumber(j.fields['Tip Amount']), 0);
   const jobsWithTips = filteredJobs.filter(j => safeNumber(j.fields['Tip Amount']) > 0);
 
-  // Expenses
-  const totalExpenses = filteredExpenses.reduce((sum, e) => sum + safeNumber(e.fields.Amount), 0);
+  // Lead Fees (non-refunded leads with fees in this period)
+  const totalLeadFees = filteredLeadsWithFees.reduce((sum, l) => sum + safeNumber(l.fields['Lead Fee']), 0);
 
-  // Expense breakdown by category
+  // Expenses (regular expenses + lead fees)
+  const regularExpenses = filteredExpenses.reduce((sum, e) => sum + safeNumber(e.fields.Amount), 0);
+  const totalExpenses = regularExpenses + totalLeadFees;
+
+  // Expense breakdown by category (include lead fees as separate category)
   const expensesByCategory = filteredExpenses.reduce((acc, e) => {
     const category = e.fields.Category || 'Other';
     acc[category] = (acc[category] || 0) + safeNumber(e.fields.Amount);
     return acc;
   }, {} as Record<string, number>);
 
-  // Net profit (actual revenue - expenses)
+  // Add lead fees as a category if there are any
+  if (totalLeadFees > 0) {
+    expensesByCategory['Lead Fees'] = totalLeadFees;
+  }
+
+  // Net profit (actual revenue - all expenses including lead fees)
   const netProfit = actualRevenue - totalExpenses;
 
   // Period label
@@ -325,6 +349,7 @@ export default function FinancesPage() {
                   'Marketing': { bg: 'bg-purple-50', bar: 'bg-purple-500' },
                   'Cleaner Payouts': { bg: 'bg-orange-50', bar: 'bg-orange-500' },
                   'Tools-Equipment': { bg: 'bg-teal-50', bar: 'bg-teal-500' },
+                  'Lead Fees': { bg: 'bg-rose-50', bar: 'bg-rose-500' },
                   'Other': { bg: 'bg-gray-50', bar: 'bg-gray-500' },
                 };
                 const color = colors[category] || colors['Other'];

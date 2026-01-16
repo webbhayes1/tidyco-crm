@@ -1,62 +1,65 @@
-# Session 27 Handoff - 2026-01-15
+# Session 28 Handoff - 2026-01-15
 
 ## Session Summary
-UI improvements to Leads page filters, Dashboard KPI cards, and date sorting fixes across multiple pages. Also helped troubleshoot Vercel environment variables for Google Places API.
+Implemented lead fee expense tracking feature with Airtable integration and updated CLAUDE.md with mandatory MCP tool usage rules.
 
 ## What Was Accomplished
 
-### 1. Leads Page - Multi-Select Status Filter
-- Replaced status buttons with a **dropdown multi-select** under Filters panel
-- Users can now filter by multiple statuses at once (checkboxes)
-- "Active only" and "All Statuses" quick options
-- Dropdown closes on click outside
+### 1. Lead Fee Expense Tracking (Full Feature)
+**Purpose**: Track Angi lead fees as business expenses, with ability to mark refunds
 
-### 2. Dashboard KPI Cards - Quick Links
-- **This Week** → Links to `/calendar`
-- **This Month** → Links to `/finances` (was already linked)
-- **Active Clients** → Links to `/clients`
-- **Active Cleaners** → Links to `/cleaners`
-- All cards now have hover effects
+**Airtable Fields Created** (via MCP tools):
+- `Lead Fee` (currency) - Fee paid for the lead
+- `Refunded` (checkbox) - Whether fee was refunded
+- `Refund Date` (date) - When refund occurred
 
-### 3. Dashboard Format Updates
-- Changed "Monthly Revenue" label to **"This Month"**
-- Changed "This Week" to show **revenue as primary number** (matching "This Month" format)
-- Both now show: Revenue (big), "X jobs scheduled" (subtext)
+**CRM Changes**:
+- **Webhook** (`app/api/leads/webhook/route.ts`) - Now saves Lead Fee from Angi payload
+- **Finances Page** (`app/(dashboard)/finances/overview/page.tsx`) - Includes non-refunded lead fees in expense calculations, shows "Lead Fees" as separate category (rose/pink color)
+- **Lead Detail Page** (`app/(dashboard)/leads/[id]/page.tsx`) - Shows Lead Fee card with "Mark as Refunded" button
+- **TypeScript Types** (`types/airtable.ts`) - Added Lead Fee, Refunded, Refund Date fields
 
-### 4. Date Sorting Fixes
-- Fixed **newest/oldest sorting** on Leads, Jobs, and Clients pages
-- Sorting was flipped - now corrected across all applicable pages
-
-### 5. Vercel Environment Variables
-- Helped troubleshoot Google Places API not working on production
-- User needed to add `NEXT_PUBLIC_GOOGLE_PLACES_API_KEY` to Vercel shared variables
-- Confirmed API key works - just needed to be added to Vercel and redeployed
+### 2. CLAUDE.md Updates - Mandatory MCP Tool Usage
+Added explicit rule requiring MCP tools for ALL Airtable modifications:
+- Located at lines 626-648 in CLAUDE.md
+- Labeled as "MANDATORY" with critical warning
+- Lists all applicable scenarios (fields, tables, records, etc.)
+- Includes Base ID and key tool names
 
 ## Files Modified
-- `app/(dashboard)/leads/pipeline/page.tsx` - Multi-select status filter
-- `app/(dashboard)/page.tsx` - Dashboard KPI card links and format
-- `app/(dashboard)/jobs/page.tsx` - Date sorting fix
-- `app/(dashboard)/clients/page.tsx` - Date sorting fix
+- `custom/app/api/leads/webhook/route.ts` - Save Lead Fee field
+- `custom/app/(dashboard)/finances/overview/page.tsx` - Include lead fees in expenses
+- `custom/app/(dashboard)/leads/[id]/page.tsx` - Lead Fee display and refund button
+- `custom/types/airtable.ts` - Lead interface updated
+- `crm/CLAUDE.md` - Added mandatory MCP tools rule
+- `crm/.claude/decisions/airtable-changelog.md` - Logged Lead Fee fields
+
+## Airtable Changes
+See `crm/.claude/decisions/airtable-changelog.md` entry for 2026-01-15:
+- Added 3 fields to Leads table via MCP tools
+- All field IDs documented
 
 ## Commits Pushed
-- `0b34959` - Trigger redeploy for env vars (empty commit)
-- Note: Other changes made but not yet committed
+- None this session - changes need to be committed
 
 ## Deployment Status
-- Local dev server running at http://localhost:3000
-- Production: https://tidyco-crm.vercel.app
-- Vercel env vars updated with shared variables
+- Local: Not running
+- Production: https://tidyco-crm.vercel.app (needs redeploy after push)
 
 ## Known Issues
 - None identified this session
 
 ## Next Session Recommendations
-1. **Commit and push** the UI changes made this session
-2. **Verify** Google Places API works on production after Vercel redeploy
-3. **Follow up with Angi** - Switch from test to live mode
-4. **n8n workflows** - Resume once Twilio A2P is approved
+1. **Commit and push** all changes from this session
+2. **Test** lead fee feature end-to-end:
+   - Send test Angi lead with fee
+   - Verify fee shows on lead detail page
+   - Test refund functionality
+   - Check Finances page shows lead fees
+3. **Verify** Google Places API works on production (from Session 27)
+4. **Follow up with Angi** - Switch from test to live mode
 
 ## Files to Read Next Session
 1. This file (`custom/.claude/HANDOFF.md`)
 2. `crm/.claude/STATUS.md`
-3. `crm/.claude/decisions/airtable-changelog.md` (no changes this session)
+3. `crm/.claude/decisions/airtable-changelog.md`

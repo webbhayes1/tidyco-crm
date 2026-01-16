@@ -40,6 +40,16 @@ export default function CleanersPage() {
 
   const cleanerColumns: Column<Cleaner>[] = [
     {
+      key: 'Color',
+      label: '',
+      render: (cleaner) => (
+        <div
+          className="w-4 h-4 rounded-full"
+          style={{ backgroundColor: cleaner.fields.Color || '#6B7280' }}
+        />
+      ),
+    },
+    {
       key: 'Name',
       label: 'Name',
       render: (cleaner) => (

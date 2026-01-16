@@ -239,9 +239,9 @@ export default function LeadsPage() {
         const timeB = b.createdTime || '';
         return timeB.localeCompare(timeA);
       case 'newest':
-        return (a.createdTime || '').localeCompare(b.createdTime || '');
-      case 'oldest':
         return (b.createdTime || '').localeCompare(a.createdTime || '');
+      case 'oldest':
+        return (a.createdTime || '').localeCompare(b.createdTime || '');
       case 'name-asc':
         return (a.fields.Name || '').localeCompare(b.fields.Name || '');
       case 'name-desc':

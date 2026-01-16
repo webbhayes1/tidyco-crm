@@ -2,10 +2,12 @@ import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
 import { DeleteButton } from '@/components/DeleteButton';
+import { CleanerColorPicker } from '@/components/CleanerColorPicker';
+import { CleanerJobsList } from '@/components/CleanerJobsList';
 import { getCleaner, getJobs, getCleanerTraining } from '@/lib/airtable';
 import { format } from 'date-fns';
 import Link from 'next/link';
-import { ArrowLeft, Edit, Mail, Phone, DollarSign, Award, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Edit, Mail, Phone, DollarSign } from 'lucide-react';
 
 export default async function CleanerDetailPage({ params }: { params: { id: string } }) {
   const cleaner = await getCleaner(params.id);
@@ -214,73 +216,8 @@ export default async function CleanerDetailPage({ params }: { params: { id: stri
             </div>
           </div>
 
-          {/* Job History */}
-          <div className="bg-white shadow sm:rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Job History ({cleanerJobs.length})
-              </h3>
-              {cleanerJobs.length > 0 ? (
-                <div className="overflow-hidden">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Date
-                        </th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Service
-                        </th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Payout
-                        </th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Quality
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {cleanerJobs.map((job) => (
-                        <tr key={job.id} className="hover:bg-gray-50">
-                          <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
-                            <Link href={`/jobs/${job.id}`} className="text-primary-600 hover:text-primary-500">
-                              {job.fields.Date ? format(new Date(job.fields.Date), 'MMM d, yyyy') : '-'}
-                            </Link>
-                          </td>
-                          <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {job.fields['Service Type']}
-                          </td>
-                          <td className="px-3 py-4 whitespace-nowrap">
-                            <StatusBadge status={job.fields.Status} />
-                          </td>
-                          <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatCurrency(typeof job.fields['Total Cleaner Payout'] === 'number' ? job.fields['Total Cleaner Payout'] : 0)}
-                          </td>
-                          <td className="px-3 py-4 whitespace-nowrap text-sm">
-                            {typeof job.fields['Quality Score'] === 'number' ? (
-                              <span className={`font-medium ${
-                                job.fields['Quality Score'] >= 80 ? 'text-green-600' :
-                                job.fields['Quality Score'] >= 70 ? 'text-yellow-600' : 'text-red-600'
-                              }`}>
-                                {job.fields['Quality Score']}
-                              </span>
-                            ) : (
-                              '-'
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">No jobs yet</p>
-              )}
-            </div>
-          </div>
+          {/* Jobs */}
+          <CleanerJobsList jobs={cleanerJobs} />
 
           {/* Notes */}
           {cleaner.fields.Notes && (
@@ -312,6 +249,14 @@ export default async function CleanerDetailPage({ params }: { params: { id: stri
                   Last job: {format(new Date(cleaner.fields['Last Job Date']), 'MMM d, yyyy')}
                 </p>
               )}
+              {/* Calendar Color */}
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <h3 className="text-base font-medium text-gray-900 mb-2">Calendar Color</h3>
+                <CleanerColorPicker
+                  cleanerId={cleaner.id}
+                  currentColor={cleaner.fields.Color}
+                />
+              </div>
             </div>
           </div>
 

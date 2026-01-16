@@ -12,13 +12,7 @@ interface EnrichedJob extends Job {
   cleanerName: string;
 }
 
-const CLEANER_COLORS: Record<string, string> = {
-  'Alice': '#4285F4',
-  'Bob': '#0B8043',
-  'Charlie': '#F6BF26',
-  'Diana': '#E67C73',
-  'Evan': '#9E69AF',
-};
+const DEFAULT_CLEANER_COLOR = '#6B7280';
 
 export default function CalendarMonthlyPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -82,14 +76,16 @@ export default function CalendarMonthlyPage() {
   const avgJobsPerDay = monthJobs.length > 0 ? (monthJobs.length / 30).toFixed(1) : '0.0';
   const unassignedJobs = monthJobs.filter(job => !job.fields.Cleaner || job.fields.Cleaner.length === 0).length;
 
-  // Get cleaner color and initial
-  const getCleanerColor = (cleanerName: string): string => {
-    const colors = Object.keys(CLEANER_COLORS);
-    const matchedColor = colors.find(name => cleanerName.includes(name));
-    if (matchedColor) {
-      return CLEANER_COLORS[matchedColor];
-    }
-    return '#6B7280';
+  // Build cleaner color map from cleaner records
+  const cleanerColorMap = new Map<string, string>();
+  cleaners.forEach(cleaner => {
+    cleanerColorMap.set(cleaner.id, cleaner.fields.Color || DEFAULT_CLEANER_COLOR);
+  });
+
+  // Get cleaner color by cleaner ID
+  const getCleanerColor = (cleanerId: string | undefined): string => {
+    if (!cleanerId) return DEFAULT_CLEANER_COLOR;
+    return cleanerColorMap.get(cleanerId) || DEFAULT_CLEANER_COLOR;
   };
 
   const getCleanerInitial = (cleanerName: string): string => {
@@ -234,7 +230,7 @@ export default function CalendarMonthlyPage() {
                 {/* Jobs List */}
                 <div className="space-y-1">
                   {dayJobs.slice(0, 3).map(job => {
-                    const color = getCleanerColor(job.cleanerName);
+                    const color = getCleanerColor(job.fields.Cleaner?.[0]);
                     const initial = getCleanerInitial(job.cleanerName);
                     const isUnassigned = !job.fields.Cleaner || job.fields.Cleaner.length === 0;
 
@@ -297,7 +293,7 @@ export default function CalendarMonthlyPage() {
         <h3 className="font-semibold mb-3">Cleaner Legend</h3>
         <div className="flex flex-wrap gap-4">
           {cleaners.filter(c => c.fields.Status === 'Active').map(cleaner => {
-            const color = getCleanerColor(cleaner.fields.Name || '');
+            const color = cleaner.fields.Color || DEFAULT_CLEANER_COLOR;
             const initial = getCleanerInitial(cleaner.fields.Name || '');
             const cleanerJobs = monthJobs.filter(job =>
               job.fields.Cleaner && job.fields.Cleaner[0] === cleaner.id

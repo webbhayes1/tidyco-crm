@@ -79,6 +79,7 @@ export interface Cleaner {
     'Jobs Below 70 Score'?: number; // Rollup
     'Experience Level'?: 'Junior' | 'Mid-Level' | 'Senior';
     'Language'?: 'English' | 'Spanish' | 'Both';
+    'Color'?: string; // Hex color for calendar display (e.g., "#4285F4")
     'Created Date'?: string;
   };
 }
@@ -344,6 +345,9 @@ export interface Lead {
     'Activities'?: string[]; // Lead Activity record IDs
     'Converted Client'?: string[]; // Client record ID when converted
     'Original Client'?: string[]; // Original client if churned re-entered as lead
+    'Lead Fee'?: number; // Fee paid for this lead (e.g., Angi lead fee)
+    'Refunded'?: boolean; // Whether the lead fee was refunded
+    'Refund Date'?: string; // Date the lead fee was refunded
     'Created Date'?: string;
     'Last Modified'?: string;
   };

@@ -32,8 +32,9 @@ export default function JobsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [loading, setLoading] = useState(true);
+  const [timeframe, setTimeframe] = useState<'upcoming' | 'past' | 'all'>('upcoming');
   const [filter, setFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<string>('date-desc');
+  const [sortBy, setSortBy] = useState<string>('date-nearest');
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [cleanerFilter, setCleanerFilter] = useState<string>('all');
   const [serviceFilter, setServiceFilter] = useState<string>('all');
@@ -186,7 +187,39 @@ export default function JobsPage() {
     serviceFilter !== 'all',
   ].filter(Boolean).length;
 
+  // Get today's date at midnight for comparison
+  const today = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return now.getTime();
+  }, []);
+
+  // Count jobs by timeframe for the toggle badges
+  const timeframeCounts = useMemo(() => {
+    let upcoming = 0;
+    let past = 0;
+    jobs.forEach(job => {
+      if (!job.fields.Date) return;
+      const jobDate = parseDate(job.fields.Date).getTime();
+      if (jobDate >= today) {
+        upcoming++;
+      } else {
+        past++;
+      }
+    });
+    return { upcoming, past, all: jobs.length };
+  }, [jobs, today]);
+
   const filteredJobs = jobs
+    .filter((job) => {
+      // Timeframe filter
+      if (timeframe === 'all') return true;
+      if (!job.fields.Date) return timeframe === 'upcoming'; // No date = treat as upcoming
+      const jobDate = parseDate(job.fields.Date).getTime();
+      if (timeframe === 'upcoming') return jobDate >= today;
+      if (timeframe === 'past') return jobDate < today;
+      return true;
+    })
     .filter((job) => {
       // Search filter - matches client name, cleaner name, service type, address, status
       if (searchQuery.trim()) {
@@ -234,15 +267,36 @@ export default function JobsPage() {
       return job.fields['Service Type'] === serviceFilter;
     })
     .sort((a, b) => {
+      const dateA = a.fields.Date ? parseDate(a.fields.Date).getTime() : 0;
+      const dateB = b.fields.Date ? parseDate(b.fields.Date).getTime() : 0;
+
       switch (sortBy) {
-        case 'date-desc':
-          const dateA = a.fields.Date ? parseDate(a.fields.Date).getTime() : 0;
-          const dateB = b.fields.Date ? parseDate(b.fields.Date).getTime() : 0;
-          return dateA - dateB;
-        case 'date-asc':
-          const dateA2 = a.fields.Date ? parseDate(a.fields.Date).getTime() : 0;
-          const dateB2 = b.fields.Date ? parseDate(b.fields.Date).getTime() : 0;
-          return dateB2 - dateA2;
+        case 'date-nearest':
+          // "Nearest" = closest to today
+          // For upcoming: smallest date first (soonest)
+          // For past: largest date first (most recent)
+          // For all: sort by absolute distance from today
+          if (timeframe === 'upcoming') {
+            return dateA - dateB; // Soonest first
+          } else if (timeframe === 'past') {
+            return dateB - dateA; // Most recent first
+          } else {
+            // All: sort by absolute distance from today
+            const distA = Math.abs(dateA - today);
+            const distB = Math.abs(dateB - today);
+            return distA - distB;
+          }
+        case 'date-furthest':
+          // Opposite of nearest
+          if (timeframe === 'upcoming') {
+            return dateB - dateA; // Furthest first
+          } else if (timeframe === 'past') {
+            return dateA - dateB; // Oldest first
+          } else {
+            const distA = Math.abs(dateA - today);
+            const distB = Math.abs(dateB - today);
+            return distB - distA;
+          }
         case 'client-asc':
           return (a.clientName || '').localeCompare(b.clientName || '');
         case 'client-desc':
@@ -276,7 +330,7 @@ export default function JobsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Jobs"
-        description={`${filteredJobs.length} total jobs`}
+        description={`${filteredJobs.length} ${timeframe === 'all' ? 'total' : timeframe} jobs`}
         actions={
           <Link
             href="/jobs/new"
@@ -287,6 +341,26 @@ export default function JobsPage() {
           </Link>
         }
       />
+
+      {/* Timeframe Toggle */}
+      <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg w-fit">
+        {(['upcoming', 'past', 'all'] as const).map((tf) => (
+          <button
+            key={tf}
+            onClick={() => setTimeframe(tf)}
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+              timeframe === tf
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            {tf === 'upcoming' ? 'Upcoming' : tf === 'past' ? 'Past' : 'All'}
+            <span className={`ml-1.5 text-xs ${timeframe === tf ? 'text-gray-500' : 'text-gray-400'}`}>
+              ({timeframeCounts[tf]})
+            </span>
+          </button>
+        ))}
+      </div>
 
       {/* Search and Filter Bar */}
       <div className="space-y-3">
@@ -336,8 +410,12 @@ export default function JobsPage() {
               onChange={(e) => setSortBy(e.target.value)}
               className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white"
             >
-              <option value="date-desc">Date (Newest)</option>
-              <option value="date-asc">Date (Oldest)</option>
+              <option value="date-nearest">
+                {timeframe === 'upcoming' ? 'Soonest First' : timeframe === 'past' ? 'Most Recent' : 'Nearest to Today'}
+              </option>
+              <option value="date-furthest">
+                {timeframe === 'upcoming' ? 'Furthest First' : timeframe === 'past' ? 'Oldest First' : 'Furthest from Today'}
+              </option>
               <option value="client-asc">Client (A-Z)</option>
               <option value="client-desc">Client (Z-A)</option>
               <option value="cleaner-asc">Cleaner (A-Z)</option>

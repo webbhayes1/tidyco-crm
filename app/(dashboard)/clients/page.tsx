@@ -1,17 +1,27 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { DataTable, Column } from '@/components/DataTable';
 import { QuickStatusSelect } from '@/components/QuickStatusSelect';
-import { Client, Cleaner } from '@/types/airtable';
-import { format } from 'date-fns';
+import { Client, Cleaner, Job } from '@/types/airtable';
+import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
 import { Plus, Search, X } from 'lucide-react';
+
+// Helper to parse date strings correctly (avoids timezone issues)
+const parseDate = (dateStr: string) => {
+  if (!dateStr) return null;
+  if (dateStr.length === 10) {
+    return new Date(dateStr + 'T12:00:00');
+  }
+  return parseISO(dateStr);
+};
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('name-asc');
@@ -20,16 +30,19 @@ export default function ClientsPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [clientsRes, cleanersRes] = await Promise.all([
+      const [clientsRes, cleanersRes, jobsRes] = await Promise.all([
         fetch('/api/clients'),
         fetch('/api/cleaners'),
+        fetch('/api/jobs'),
       ]);
-      const [clientsData, cleanersData] = await Promise.all([
+      const [clientsData, cleanersData, jobsData] = await Promise.all([
         clientsRes.json(),
         cleanersRes.json(),
+        jobsRes.json(),
       ]);
       setClients(clientsData);
       setCleaners(cleanersData);
+      setJobs(jobsData);
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
@@ -43,6 +56,45 @@ export default function ClientsPage() {
 
   // Create lookup map for cleaner names
   const cleanerMap = new Map(cleaners.map(c => [c.id, c.fields.Name]));
+
+  // Get today at midnight for comparison
+  const today = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return now.getTime();
+  }, []);
+
+  // Build a map of client ID -> { lastBooking, nextBooking }
+  const clientBookingsMap = useMemo(() => {
+    const map = new Map<string, { lastBooking: Date | null; nextBooking: Date | null }>();
+
+    jobs.forEach(job => {
+      const clientId = job.fields.Client?.[0];
+      if (!clientId || !job.fields.Date) return;
+
+      const jobDate = parseDate(job.fields.Date);
+      if (!jobDate) return;
+
+      const jobTime = jobDate.getTime();
+      const current = map.get(clientId) || { lastBooking: null, nextBooking: null };
+
+      if (jobTime < today) {
+        // Past job - find the most recent one (closest to today)
+        if (!current.lastBooking || jobTime > current.lastBooking.getTime()) {
+          current.lastBooking = jobDate;
+        }
+      } else {
+        // Future job (including today) - find the soonest one
+        if (!current.nextBooking || jobTime < current.nextBooking.getTime()) {
+          current.nextBooking = jobDate;
+        }
+      }
+
+      map.set(clientId, current);
+    });
+
+    return map;
+  }, [jobs, today]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -89,15 +141,21 @@ export default function ClientsPage() {
       render: (client) => formatCurrency(client.fields['Total Lifetime Value'] || 0),
     },
     {
-      key: 'Last Booking Date',
+      key: 'Last Booking',
       label: 'Last Booking',
       render: (client) => {
-        if (!client.fields['Last Booking Date']) return '-';
-        try {
-          return format(new Date(client.fields['Last Booking Date']), 'MMM d, yyyy');
-        } catch {
-          return '-';
-        }
+        const bookings = clientBookingsMap.get(client.id);
+        if (!bookings?.lastBooking) return <span className="text-gray-400">-</span>;
+        return format(bookings.lastBooking, 'MMM d, yyyy');
+      },
+    },
+    {
+      key: 'Next Booking',
+      label: 'Next Booking',
+      render: (client) => {
+        const bookings = clientBookingsMap.get(client.id);
+        if (!bookings?.nextBooking) return <span className="text-gray-400">-</span>;
+        return <span className="text-primary-600 font-medium">{format(bookings.nextBooking, 'MMM d, yyyy')}</span>;
       },
     },
     {
@@ -163,13 +221,20 @@ export default function ClientsPage() {
         case 'ltv-low':
           return (a.fields['Total Lifetime Value'] || 0) - (b.fields['Total Lifetime Value'] || 0);
         case 'recent':
-          const dateA = a.fields['Last Booking Date'] ? new Date(a.fields['Last Booking Date']).getTime() : 0;
-          const dateB = b.fields['Last Booking Date'] ? new Date(b.fields['Last Booking Date']).getTime() : 0;
-          return dateA - dateB;
+          // Sort by most recent past booking (clients with recent activity first)
+          const lastA = clientBookingsMap.get(a.id)?.lastBooking?.getTime() || 0;
+          const lastB = clientBookingsMap.get(b.id)?.lastBooking?.getTime() || 0;
+          return lastB - lastA;
         case 'oldest':
-          const dateA2 = a.fields['Last Booking Date'] ? new Date(a.fields['Last Booking Date']).getTime() : 0;
-          const dateB2 = b.fields['Last Booking Date'] ? new Date(b.fields['Last Booking Date']).getTime() : 0;
-          return dateB2 - dateA2;
+          // Sort by oldest past booking (clients needing attention first)
+          const lastA2 = clientBookingsMap.get(a.id)?.lastBooking?.getTime() || 0;
+          const lastB2 = clientBookingsMap.get(b.id)?.lastBooking?.getTime() || 0;
+          return lastA2 - lastB2;
+        case 'next-soonest':
+          // Sort by next upcoming booking (soonest first)
+          const nextA = clientBookingsMap.get(a.id)?.nextBooking?.getTime() || Infinity;
+          const nextB = clientBookingsMap.get(b.id)?.nextBooking?.getTime() || Infinity;
+          return nextA - nextB;
         case 'cleaner-asc':
           const cleanerNameA = a.fields['Preferred Cleaner']?.[0] ? (cleanerMap.get(a.fields['Preferred Cleaner'][0]) || '') : '';
           const cleanerNameB = b.fields['Preferred Cleaner']?.[0] ? (cleanerMap.get(b.fields['Preferred Cleaner'][0]) || '') : '';
@@ -307,8 +372,9 @@ export default function ClientsPage() {
             <option value="cleaner-desc">Cleaner (Z-A)</option>
             <option value="ltv-high">LTV (High-Low)</option>
             <option value="ltv-low">LTV (Low-High)</option>
-            <option value="recent">Recent Activity</option>
-            <option value="oldest">Oldest Activity</option>
+            <option value="next-soonest">Next Booking (Soonest)</option>
+            <option value="recent">Last Booking (Recent)</option>
+            <option value="oldest">Last Booking (Oldest)</option>
           </select>
         </div>
       </div>
