@@ -159,8 +159,12 @@ export default function LeadsPage() {
     const orderB = STATUS_ORDER.indexOf(statusB as LeadStatus);
     if (orderA !== orderB) return orderA - orderB;
     // Secondary sort by created date (newest first)
+    // Leads without dates are treated as newest (appear first)
     const dateA = a.fields['Created Date'] || '';
     const dateB = b.fields['Created Date'] || '';
+    if (!dateA && !dateB) return 0;
+    if (!dateA) return -1; // A has no date, put it first
+    if (!dateB) return 1;  // B has no date, put it first
     return dateB.localeCompare(dateA);
   });
 

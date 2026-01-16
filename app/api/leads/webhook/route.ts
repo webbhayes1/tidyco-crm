@@ -102,6 +102,9 @@ function normalizeLeadData(data: Record<string, unknown>): Record<string, unknow
   // Always set status to New
   normalized.Status = 'New';
 
+  // Set Created Date to now
+  normalized['Created Date'] = new Date().toISOString().split('T')[0];
+
   return normalized;
 }
 
