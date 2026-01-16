@@ -1,94 +1,53 @@
-# Session 24 Handoff - 2026-01-15
+# Session 25 Handoff - 2026-01-15
 
 ## Session Summary
-Continued from Session 23. Fixed lead sorting, updated webhook for Angi API compatibility, and tested webhook integration.
+Added search and filter improvements to Jobs and Leads pages for better data navigation.
 
 ## What Was Accomplished
 
-### 1. Lead Sorting Fix
-- **Issue**: Newest leads weren't appearing at the top of the pipeline
-- **Root cause**: Leads without Created Date were sorting incorrectly; Airtable record IDs aren't sequential
-- **Solution**:
-  - Added `createdTime` (Airtable system field) to Lead interface in `types/airtable.ts`
-  - Updated `convertRecord()` in `lib/airtable.ts` to include `createdTime`
-  - Pipeline now sorts by status order, then by `createdTime` (newest first)
+### 1. Jobs Page - Column Filters
+- Added **Client filter** dropdown - filter jobs by specific client
+- Added **Cleaner filter** dropdown - filter by cleaner or "Unassigned"
+- Added **Service filter** dropdown - filter by service type (General Clean, Deep Clean, etc.)
+- Filters work in combination with existing status filters
 
-### 2. Lead Status Dropdown
-- Added `lead` status type to `QuickStatusSelect` component
-- Lead statuses: New, Contacted, Qualified, Quote Sent, Won, Lost, Churned
-- Pipeline page now uses QuickStatusSelect for inline status updates
-- Status changes sync with Airtable
+### 2. Jobs Page - Search & Filter Reorganization
+- Added **Search bar** at top - searches across client name, cleaner name, service type, address, status, job ID
+- Created **collapsible "Filters" button** that expands/collapses filter panel
+- Filter badge shows count of active filters (e.g., "Filters 2")
+- Added **"Clear All" button** to reset all filters at once
+- Sort dropdown remains visible in top bar
 
-### 3. Client Pricing UI Update
-- Reorganized pricing section on client detail page
-- Main highlight: Profit (green box)
-- Below: Cleaner Pay + Client Charge in smaller boxes side-by-side
-- Fixed design consistency issue (was using undefined colors like `tidyco-100`)
+### 3. Clients Page - Cleaner Sorting
+- Added **Cleaner (A-Z)** and **Cleaner (Z-A)** sort options
+- Unassigned clients sort to the end in both sort directions
 
-### 4. Angi Webhook Integration (Major Update)
-- **Location**: `app/api/leads/webhook/route.ts`
-- **Problem**: Angi wasn't delivering leads - our response format was wrong
-- **Fix**: Updated webhook to match Angi Lead Integration API spec exactly
-
-**Key changes:**
-- Response format: Now returns exactly `{"status":"success"}` (Angi requires this exact format)
-- Field mapping for all Angi fields:
-  - `stateProvince` → State
-  - `postalCode` → Zip Code
-  - `primaryPhone` → Phone
-  - `leadOid` → Angi Lead ID (for deduplication)
-  - `taskName` → Service Type Interested
-  - `comments` → Notes
-  - `interview` array → Q&A details in Notes
-  - `fee` → Lead fee recorded in Notes
-  - `leadSource` → Auto-detects "Angi" from payload
-- Added console logging for debugging (shows in Vercel logs)
-
-**API Documentation**: Angi Lead Integration API spec saved at `/Users/webbhayes/Desktop/Angi Lead Integration API_ (1) (2).pdf`
-
-**Webhook URL**: `https://tidyco-crm.vercel.app/api/leads/webhook`
-
-### 5. Design System Documentation
-- Added Design System Reference section to CLAUDE.md
-- Clarified correct colors to use: `tidyco-blue`, `tidyco-navy`, standard Tailwind
-- Warning: DO NOT use `tidyco-100`, `tidyco-700`, `tidyco-800` (defined but not used)
+### 4. Leads Pipeline - Search
+- Added **Search bar** - searches across name, email, phone, address, city, lead source, service type, notes
+- Search works in combination with status filters
 
 ## Files Modified
-- `app/api/leads/webhook/route.ts` - Complete rewrite for Angi compatibility
-- `app/(dashboard)/leads/pipeline/page.tsx` - Sorting fix + QuickStatusSelect
-- `app/(dashboard)/clients/[id]/page.tsx` - Pricing UI reorganization
-- `components/QuickStatusSelect.tsx` - Added lead status type
-- `lib/airtable.ts` - Added createdTime to convertRecord
-- `types/airtable.ts` - Added createdTime to Lead interface
+- `app/(dashboard)/jobs/page.tsx` - Search, filters button, collapsible filter panel
+- `app/(dashboard)/clients/page.tsx` - Cleaner sorting options
+- `app/(dashboard)/leads/pipeline/page.tsx` - Search functionality
 
 ## Testing Results
-- ✅ Webhook test with Angi-format payload successful
-- ✅ Returns `{"status":"success"}`
-- ✅ Lead created with all fields mapped correctly
-- ✅ Interview Q&A and fee recorded in Notes
-
-## Test Leads Created (Clean Up)
-- "Test Lead After Fix" - from earlier webhook testing
-- "Angi Test User" - from Angi format testing
+- Build passes successfully
+- All search and filter functionality works as expected
+- Filters combine correctly (search + status + client + cleaner + service)
 
 ## Deployment Status
-- All changes pushed to GitHub and deployed to Vercel
-- Production webhook ready for Angi integration
-
-## Pending: Angi Configuration
-User needs to:
-1. Email Angi with webhook URL: `https://tidyco-crm.vercel.app/api/leads/webhook`
-2. Request them to send a test lead
-3. Check Vercel logs to confirm receipt
+- Changes NOT yet pushed to GitHub
+- Ready for commit and deploy
 
 ## Known Issues
 - None identified this session
 
 ## Next Session Recommendations
-1. **Verify Angi integration** - Wait for Angi to configure webhook, then verify leads come through
-2. **Clean up test leads** - Delete test leads from Airtable
-3. **n8n workflows** - Resume workflow development (see `.claude/coordination/chain-2-status.md`)
-4. **Consider**: Adding appointment capture to webhook if Angi sends appointment data
+1. **Push changes to GitHub** - Commit and deploy the search/filter improvements
+2. **Verify Angi integration** - Still waiting for Angi to configure webhook
+3. **n8n workflows** - Resume workflow development (Twilio A2P still pending approval)
+4. **Consider**: Adding search to Clients page for consistency
 
 ## Files to Read Next Session
 1. This file (`custom/.claude/HANDOFF.md`)

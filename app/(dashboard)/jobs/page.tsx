@@ -1,14 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { DataTable, Column } from '@/components/DataTable';
 import { QuickStatusSelect } from '@/components/QuickStatusSelect';
 import { MarkPaidButton } from '@/components/MarkPaidButton';
-import { Job } from '@/types/airtable';
+import { Job, Client, Cleaner } from '@/types/airtable';
 import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
-import { Plus } from 'lucide-react';
+import { Plus, Search, Filter, X } from 'lucide-react';
 
 // Helper to parse date strings correctly (avoids timezone issues)
 const parseDate = (dateStr: string) => {
@@ -29,15 +29,32 @@ type EnrichedJob = Job & {
 
 export default function JobsPage() {
   const [jobs, setJobs] = useState<EnrichedJob[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('date-desc');
+  const [clientFilter, setClientFilter] = useState<string>('all');
+  const [cleanerFilter, setCleanerFilter] = useState<string>('all');
+  const [serviceFilter, setServiceFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [showFilters, setShowFilters] = useState<boolean>(false);
 
   const fetchJobs = async () => {
     try {
-      const response = await fetch('/api/jobs');
-      const data = await response.json();
-      setJobs(data);
+      const [jobsRes, clientsRes, cleanersRes] = await Promise.all([
+        fetch('/api/jobs'),
+        fetch('/api/clients'),
+        fetch('/api/cleaners'),
+      ]);
+      const [jobsData, clientsData, cleanersData] = await Promise.all([
+        jobsRes.json(),
+        clientsRes.json(),
+        cleanersRes.json(),
+      ]);
+      setJobs(jobsData);
+      setClients(clientsData);
+      setCleaners(cleanersData);
     } catch (error) {
       console.error('Failed to fetch jobs:', error);
     } finally {
@@ -48,6 +65,17 @@ export default function JobsPage() {
   useEffect(() => {
     fetchJobs();
   }, []);
+
+  // Get unique service types from jobs
+  const serviceTypes = useMemo(() => {
+    const types = new Set<string>();
+    jobs.forEach(job => {
+      if (job.fields['Service Type']) {
+        types.add(job.fields['Service Type']);
+      }
+    });
+    return Array.from(types).sort();
+  }, [jobs]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -150,13 +178,60 @@ export default function JobsPage() {
     },
   ];
 
+  // Count active filters
+  const activeFilterCount = [
+    filter !== 'all',
+    clientFilter !== 'all',
+    cleanerFilter !== 'all',
+    serviceFilter !== 'all',
+  ].filter(Boolean).length;
+
   const filteredJobs = jobs
     .filter((job) => {
+      // Search filter - matches client name, cleaner name, service type, address, status
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const clientName = (job.clientName || '').toLowerCase();
+        const cleanerName = (job.cleanerName || '').toLowerCase();
+        const cleanerNames = (job.cleanerNames || []).join(' ').toLowerCase();
+        const serviceType = (job.fields['Service Type'] || '').toLowerCase();
+        const address = (job.fields.Address || '').toLowerCase();
+        const status = (job.fields.Status || '').toLowerCase();
+        const jobId = String(job.fields['Job ID'] || '').toLowerCase();
+
+        return clientName.includes(query) ||
+               cleanerName.includes(query) ||
+               cleanerNames.includes(query) ||
+               serviceType.includes(query) ||
+               address.includes(query) ||
+               status.includes(query) ||
+               jobId.includes(query);
+      }
+      return true;
+    })
+    .filter((job) => {
+      // Status filter
       if (filter === 'unassigned') return !job.fields.Cleaner?.length;
       if (filter === 'pending') return job.fields.Status === 'Pending';
       if (filter === 'scheduled') return job.fields.Status === 'Scheduled';
       if (filter === 'completed') return job.fields.Status === 'Completed';
       return true; // 'all'
+    })
+    .filter((job) => {
+      // Client filter
+      if (clientFilter === 'all') return true;
+      return job.fields.Client?.[0] === clientFilter;
+    })
+    .filter((job) => {
+      // Cleaner filter
+      if (cleanerFilter === 'all') return true;
+      if (cleanerFilter === 'unassigned') return !job.fields.Cleaner?.length;
+      return job.fields.Cleaner?.includes(cleanerFilter);
+    })
+    .filter((job) => {
+      // Service type filter
+      if (serviceFilter === 'all') return true;
+      return job.fields['Service Type'] === serviceFilter;
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -201,43 +276,162 @@ export default function JobsPage() {
         }
       />
 
-      {/* Filters Row */}
-      <div className="flex flex-wrap items-center gap-4">
-        {/* Status Filters */}
-        <div className="flex space-x-2">
-          {['all', 'unassigned', 'pending', 'scheduled', 'completed'].map((filterOption) => (
-            <button
-              key={filterOption}
-              onClick={() => setFilter(filterOption)}
-              className={`px-3 py-2 text-sm font-medium rounded-md ${
-                filter === filterOption
-                  ? filterOption === 'unassigned' ? 'bg-orange-500 text-white' : 'bg-primary-600 text-white'
-                  : filterOption === 'unassigned'
-                    ? 'bg-white text-orange-600 hover:bg-orange-50 border border-orange-300'
-                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-              }`}
+      {/* Search and Filter Bar */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          {/* Search */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search jobs..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Filters Button */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border ${
+              showFilters || activeFilterCount > 0
+                ? 'bg-primary-50 text-primary-700 border-primary-300'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="ml-2 inline-flex items-center justify-center w-5 h-5 text-xs font-bold bg-primary-600 text-white rounded-full">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
+          {/* Sort */}
+          <div className="flex items-center gap-2">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white"
             >
-              {filterOption.charAt(0).toUpperCase() + filterOption.slice(1)}
-            </button>
-          ))}
+              <option value="date-desc">Date (Newest)</option>
+              <option value="date-asc">Date (Oldest)</option>
+              <option value="client-asc">Client (A-Z)</option>
+              <option value="client-desc">Client (Z-A)</option>
+              <option value="amount-high">Amount (High-Low)</option>
+              <option value="amount-low">Amount (Low-High)</option>
+            </select>
+          </div>
         </div>
 
-        {/* Sort */}
-        <div className="flex items-center gap-2 ml-auto">
-          <label className="text-sm text-gray-600">Sort:</label>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white"
-          >
-            <option value="date-desc">Date (Newest)</option>
-            <option value="date-asc">Date (Oldest)</option>
-            <option value="client-asc">Client (A-Z)</option>
-            <option value="client-desc">Client (Z-A)</option>
-            <option value="amount-high">Amount (High-Low)</option>
-            <option value="amount-low">Amount (Low-High)</option>
-          </select>
-        </div>
+        {/* Collapsible Filters Panel */}
+        {showFilters && (
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Status Filters */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</label>
+                <div className="flex flex-wrap gap-2">
+                  {['all', 'unassigned', 'pending', 'scheduled', 'completed'].map((filterOption) => (
+                    <button
+                      key={filterOption}
+                      onClick={() => setFilter(filterOption)}
+                      className={`px-3 py-1.5 text-sm font-medium rounded-md ${
+                        filter === filterOption
+                          ? filterOption === 'unassigned' ? 'bg-orange-500 text-white' : 'bg-primary-600 text-white'
+                          : filterOption === 'unassigned'
+                            ? 'bg-white text-orange-600 hover:bg-orange-50 border border-orange-300'
+                            : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                      }`}
+                    >
+                      {filterOption.charAt(0).toUpperCase() + filterOption.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Client Filter */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Client</label>
+                <select
+                  value={clientFilter}
+                  onChange={(e) => setClientFilter(e.target.value)}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-md bg-white min-w-[150px]"
+                >
+                  <option value="all">All Clients</option>
+                  {clients.map(client => (
+                    <option key={client.id} value={client.id}>
+                      {client.fields.Name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Cleaner Filter */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cleaner</label>
+                <select
+                  value={cleanerFilter}
+                  onChange={(e) => setCleanerFilter(e.target.value)}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-md bg-white min-w-[150px]"
+                >
+                  <option value="all">All Cleaners</option>
+                  <option value="unassigned">Unassigned</option>
+                  {cleaners.filter(c => c.fields.Status === 'Active').map(cleaner => (
+                    <option key={cleaner.id} value={cleaner.id}>
+                      {cleaner.fields.Name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Service Type Filter */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Service</label>
+                <select
+                  value={serviceFilter}
+                  onChange={(e) => setServiceFilter(e.target.value)}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-md bg-white min-w-[150px]"
+                >
+                  <option value="all">All Services</option>
+                  {serviceTypes.map(type => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Clear Filters */}
+              {activeFilterCount > 0 && (
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-medium text-transparent">Clear</label>
+                  <button
+                    onClick={() => {
+                      setFilter('all');
+                      setClientFilter('all');
+                      setCleanerFilter('all');
+                      setServiceFilter('all');
+                    }}
+                    className="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md border border-red-200"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <DataTable

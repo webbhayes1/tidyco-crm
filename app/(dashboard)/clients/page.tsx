@@ -148,6 +148,20 @@ export default function ClientsPage() {
           const dateA2 = a.fields['Last Booking Date'] ? new Date(a.fields['Last Booking Date']).getTime() : 0;
           const dateB2 = b.fields['Last Booking Date'] ? new Date(b.fields['Last Booking Date']).getTime() : 0;
           return dateA2 - dateB2;
+        case 'cleaner-asc':
+          const cleanerNameA = a.fields['Preferred Cleaner']?.[0] ? (cleanerMap.get(a.fields['Preferred Cleaner'][0]) || '') : '';
+          const cleanerNameB = b.fields['Preferred Cleaner']?.[0] ? (cleanerMap.get(b.fields['Preferred Cleaner'][0]) || '') : '';
+          // Put unassigned at the end
+          if (!cleanerNameA && cleanerNameB) return 1;
+          if (cleanerNameA && !cleanerNameB) return -1;
+          return cleanerNameA.localeCompare(cleanerNameB);
+        case 'cleaner-desc':
+          const cleanerNameA2 = a.fields['Preferred Cleaner']?.[0] ? (cleanerMap.get(a.fields['Preferred Cleaner'][0]) || '') : '';
+          const cleanerNameB2 = b.fields['Preferred Cleaner']?.[0] ? (cleanerMap.get(b.fields['Preferred Cleaner'][0]) || '') : '';
+          // Put unassigned at the end
+          if (!cleanerNameA2 && cleanerNameB2) return 1;
+          if (cleanerNameA2 && !cleanerNameB2) return -1;
+          return cleanerNameB2.localeCompare(cleanerNameA2);
         default:
           return 0;
       }
@@ -247,6 +261,8 @@ export default function ClientsPage() {
           >
             <option value="name-asc">Name (A-Z)</option>
             <option value="name-desc">Name (Z-A)</option>
+            <option value="cleaner-asc">Cleaner (A-Z)</option>
+            <option value="cleaner-desc">Cleaner (Z-A)</option>
             <option value="ltv-high">LTV (High-Low)</option>
             <option value="ltv-low">LTV (Low-High)</option>
             <option value="recent">Recent Activity</option>

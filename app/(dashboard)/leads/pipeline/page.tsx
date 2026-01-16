@@ -7,7 +7,7 @@ import { QuickStatusSelect } from '@/components/QuickStatusSelect';
 import { Lead } from '@/types/airtable';
 import { format } from 'date-fns';
 import Link from 'next/link';
-import { Plus, Upload, Phone, Mail, Link2, Copy, Check, ExternalLink } from 'lucide-react';
+import { Plus, Upload, Phone, Mail, Link2, Copy, Check, ExternalLink, Search, X } from 'lucide-react';
 
 type LeadStatus = 'New' | 'Contacted' | 'Qualified' | 'Quote Sent' | 'Won' | 'Lost' | 'Churned';
 
@@ -19,6 +19,7 @@ export default function LeadsPage() {
   const [filter, setFilter] = useState<string>('active');
   const [showImportModal, setShowImportModal] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   const fetchLeads = useCallback(async () => {
     try {
@@ -141,15 +142,40 @@ export default function LeadsPage() {
     },
   ];
 
-  // Filter leads based on selected filter
-  const filteredLeads = leads.filter((lead) => {
-    const status = lead.fields.Status || 'New';
-    if (filter === 'active') {
-      return !['Won', 'Lost', 'Churned'].includes(status);
-    }
-    if (filter === 'all') return true;
-    return status === filter;
-  });
+  // Filter leads based on search and selected filter
+  const filteredLeads = leads
+    .filter((lead) => {
+      // Search filter
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const name = (lead.fields.Name || '').toLowerCase();
+        const email = (lead.fields.Email || '').toLowerCase();
+        const phone = (lead.fields.Phone || '').toLowerCase();
+        const address = (lead.fields.Address || '').toLowerCase();
+        const city = (lead.fields.City || '').toLowerCase();
+        const source = (lead.fields['Lead Source'] || '').toLowerCase();
+        const service = (lead.fields['Service Type Interested'] || '').toLowerCase();
+        const notes = (lead.fields.Notes || '').toLowerCase();
+
+        return name.includes(query) ||
+               email.includes(query) ||
+               phone.includes(query) ||
+               address.includes(query) ||
+               city.includes(query) ||
+               source.includes(query) ||
+               service.includes(query) ||
+               notes.includes(query);
+      }
+      return true;
+    })
+    .filter((lead) => {
+      const status = lead.fields.Status || 'New';
+      if (filter === 'active') {
+        return !['Won', 'Lost', 'Churned'].includes(status);
+      }
+      if (filter === 'all') return true;
+      return status === filter;
+    });
 
   // Sort by status order, then by Airtable creation time (newest first)
   const sortedLeads = [...filteredLeads].sort((a, b) => {
@@ -208,6 +234,29 @@ export default function LeadsPage() {
           </div>
         }
       />
+
+      {/* Search and Filters */}
+      <div className="flex flex-wrap items-center gap-4">
+        {/* Search */}
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search leads..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Status Filters */}
       <div className="flex flex-wrap gap-2">
