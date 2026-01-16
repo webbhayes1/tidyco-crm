@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Loader2 } from 'lucide-react';
 
-type StatusType = 'job' | 'client' | 'cleaner';
+type StatusType = 'job' | 'client' | 'cleaner' | 'lead';
 
 interface StatusOption {
   value: string;
@@ -30,6 +30,15 @@ const STATUS_OPTIONS: Record<StatusType, StatusOption[]> = {
     { value: 'Active', label: 'Active', color: 'text-green-800', bgColor: 'bg-green-100', hoverColor: 'hover:bg-green-200' },
     { value: 'Inactive', label: 'Inactive', color: 'text-orange-800', bgColor: 'bg-orange-100', hoverColor: 'hover:bg-orange-200' },
     { value: 'On Leave', label: 'On Leave', color: 'text-blue-800', bgColor: 'bg-blue-100', hoverColor: 'hover:bg-blue-200' },
+  ],
+  lead: [
+    { value: 'New', label: 'New', color: 'text-blue-800', bgColor: 'bg-blue-100', hoverColor: 'hover:bg-blue-200' },
+    { value: 'Contacted', label: 'Contacted', color: 'text-yellow-800', bgColor: 'bg-yellow-100', hoverColor: 'hover:bg-yellow-200' },
+    { value: 'Qualified', label: 'Qualified', color: 'text-purple-800', bgColor: 'bg-purple-100', hoverColor: 'hover:bg-purple-200' },
+    { value: 'Quote Sent', label: 'Quote Sent', color: 'text-indigo-800', bgColor: 'bg-indigo-100', hoverColor: 'hover:bg-indigo-200' },
+    { value: 'Won', label: 'Won', color: 'text-green-800', bgColor: 'bg-green-100', hoverColor: 'hover:bg-green-200' },
+    { value: 'Lost', label: 'Lost', color: 'text-red-800', bgColor: 'bg-red-100', hoverColor: 'hover:bg-red-200' },
+    { value: 'Churned', label: 'Churned', color: 'text-gray-800', bgColor: 'bg-gray-100', hoverColor: 'hover:bg-gray-200' },
   ],
 };
 

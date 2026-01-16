@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { DataTable, Column } from '@/components/DataTable';
-import { StatusBadge } from '@/components/StatusBadge';
+import { QuickStatusSelect } from '@/components/QuickStatusSelect';
 import { Lead } from '@/types/airtable';
 import { format } from 'date-fns';
 import Link from 'next/link';
@@ -129,7 +129,15 @@ export default function LeadsPage() {
     {
       key: 'Status',
       label: 'Status',
-      render: (lead) => <StatusBadge status={lead.fields.Status || 'New'} />,
+      render: (lead) => (
+        <QuickStatusSelect
+          recordId={lead.id}
+          currentStatus={lead.fields.Status || 'New'}
+          statusType="lead"
+          apiEndpoint="/api/leads"
+          onSuccess={fetchLeads}
+        />
+      ),
     },
   ];
 

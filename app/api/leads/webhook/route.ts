@@ -5,10 +5,21 @@ import { createLead, getLeads } from '@/lib/airtable';
 function normalizeLeadData(data: Record<string, unknown>): Record<string, unknown> {
   const normalized: Record<string, unknown> = {};
 
-  // Name variations
-  const name = data.name || data.customer_name || data.full_name ||
-    (data.first_name && data.last_name ? `${data.first_name} ${data.last_name}` : null) ||
-    data.firstName && data.lastName ? `${data.firstName} ${data.lastName}` : null;
+  // Name variations - check for full name first, then combine first+last
+  let name = data.name || data.customer_name || data.full_name || data.Name;
+
+  // If no full name, try to combine first + last name
+  if (!name) {
+    const firstName = data.first_name || data.firstName || data.customer_first_name ||
+      data.customerFirstName || data['Customer First Name'] || '';
+    const lastName = data.last_name || data.lastName || data.customer_last_name ||
+      data.customerLastName || data['Customer Last Name'] || '';
+
+    if (firstName || lastName) {
+      name = [firstName, lastName].filter(Boolean).join(' ');
+    }
+  }
+
   if (name) normalized.Name = String(name).trim();
 
   // Email variations
