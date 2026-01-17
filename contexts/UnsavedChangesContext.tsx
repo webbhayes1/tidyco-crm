@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, useRef, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useRef, useEffect, ReactNode } from 'react';
 import { UnsavedChangesModal } from '../components/UnsavedChangesModal';
 import { DraftSaveModal } from '../components/DraftSaveModal';
 
@@ -140,6 +140,65 @@ export function UnsavedChangesProvider({ children }: UnsavedChangesProviderProps
     formStatesRef.current = {}; // Update ref synchronously
     setFormStates({});
   }, []);
+
+  // Ref to track if we're handling a confirmed back navigation
+  const isHandlingBackNavigation = useRef(false);
+
+  // Global popstate handler for browser back/forward buttons
+  // This is at the provider level so it's always active
+  useEffect(() => {
+    // Push initial guard state
+    window.history.pushState({ unsavedChangesGuard: true }, '');
+
+    const handlePopState = () => {
+      // If we're in the middle of a confirmed navigation, let it through
+      if (isHandlingBackNavigation.current) {
+        isHandlingBackNavigation.current = false;
+        return;
+      }
+
+      // Check if any form is dirty
+      const states = formStatesRef.current;
+      const hasDirty = Object.values(states).some(state => state.dirty);
+
+      if (!hasDirty) {
+        // Not dirty - let navigation happen, but push guard state for next time
+        window.history.pushState({ unsavedChangesGuard: true }, '');
+        return;
+      }
+
+      // Form is dirty - prevent navigation by pushing state back
+      window.history.pushState({ unsavedChangesGuard: true }, '');
+
+      // Find the first dirty form to determine which modal to show
+      const draftForm = Object.entries(states).find(([, state]) => state.dirty && state.type === 'draft');
+      const editForm = Object.entries(states).find(([, state]) => state.dirty && state.type === 'edit');
+
+      // Create the navigation callback
+      const navigateBack = () => {
+        isHandlingBackNavigation.current = true;
+        formStatesRef.current = {};
+        setFormStates({});
+        // Go back twice: once for guard state we pushed, once for actual back
+        window.history.go(-2);
+      };
+
+      setPendingNavigation(() => navigateBack);
+
+      if (draftForm) {
+        setActiveDraftForm({
+          entityType: draftForm[1].entityType || 'item',
+          onSaveDraft: draftForm[1].onSaveDraft
+        });
+        setShowDraftModal(true);
+      } else if (editForm) {
+        setShowEditModal(true);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []); // Empty deps - only run once on mount
 
   // Edit modal handlers
   const handleEditStay = useCallback(() => {

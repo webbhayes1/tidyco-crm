@@ -74,15 +74,18 @@ export default async function WorkingDashboardPage() {
         {/* KPI Cards */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {/* This Week */}
-          <Link href="/calendar" className="block">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-5 sm:p-6 hover:border-tidyco-blue hover:shadow-md transition-all cursor-pointer">
+          <Link href="/calendar" className="block h-full">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-5 sm:p-6 hover:border-tidyco-blue hover:shadow-md transition-all cursor-pointer h-full">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <dt className="text-sm font-medium text-gray-500 truncate">This Week</dt>
                   <dd className="mt-1 text-3xl font-semibold tracking-tight text-tidyco-navy">
                     {formatCurrency(metrics.thisWeekRevenue)}
                   </dd>
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-sm font-medium text-green-600">
+                    {formatCurrency(metrics.thisWeekProfit)} profit
+                  </p>
+                  <p className="text-sm text-gray-500">
                     {metrics.thisWeekJobsCount} jobs scheduled
                   </p>
                 </div>
@@ -94,15 +97,18 @@ export default async function WorkingDashboardPage() {
           </Link>
 
           {/* This Month */}
-          <Link href="/finances" className="block">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-5 sm:p-6 hover:border-tidyco-blue hover:shadow-md transition-all cursor-pointer">
+          <Link href="/finances" className="block h-full">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-5 sm:p-6 hover:border-tidyco-blue hover:shadow-md transition-all cursor-pointer h-full">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <dt className="text-sm font-medium text-gray-500 truncate">This Month</dt>
                   <dd className="mt-1 text-3xl font-semibold tracking-tight text-tidyco-navy">
                     {formatCurrency(metrics.expectedMonthlyRevenue)}
                   </dd>
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-sm font-medium text-green-600">
+                    {formatCurrency(metrics.thisMonthProfit)} profit
+                  </p>
+                  <p className="text-sm text-gray-500">
                     {metrics.thisMonthJobsCount} jobs scheduled
                   </p>
                 </div>
@@ -114,8 +120,8 @@ export default async function WorkingDashboardPage() {
           </Link>
 
           {/* Active Clients */}
-          <Link href="/clients" className="block">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-5 sm:p-6 hover:border-tidyco-blue hover:shadow-md transition-all cursor-pointer">
+          <Link href="/clients" className="block h-full">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-5 sm:p-6 hover:border-tidyco-blue hover:shadow-md transition-all cursor-pointer h-full">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <dt className="text-sm font-medium text-gray-500 truncate">Active Clients</dt>
@@ -134,8 +140,8 @@ export default async function WorkingDashboardPage() {
           </Link>
 
           {/* Active Cleaners */}
-          <Link href="/cleaners" className="block">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-5 sm:p-6 hover:border-tidyco-blue hover:shadow-md transition-all cursor-pointer">
+          <Link href="/cleaners" className="block h-full">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-5 sm:p-6 hover:border-tidyco-blue hover:shadow-md transition-all cursor-pointer h-full">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <dt className="text-sm font-medium text-gray-500 truncate">Active Cleaners</dt>

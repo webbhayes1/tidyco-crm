@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from 'react';
-import { usePathname } from 'next/navigation';
 import { useUnsavedChangesContext } from '../contexts/UnsavedChangesContext';
 
 interface UseUnsavedChangesOptions<T> {
@@ -43,7 +42,7 @@ export function useUnsavedChanges<T>({
   entityType,
   onSaveDraft,
 }: UseUnsavedChangesOptions<T>): UseUnsavedChangesReturn {
-  const { registerForm, unregisterForm, updateFormCallback, markFormDirty, isDirty: contextIsDirty, confirmNavigation, allowNavigation } = useUnsavedChangesContext();
+  const { registerForm, unregisterForm, updateFormCallback, markFormDirty, isDirty: contextIsDirty } = useUnsavedChangesContext();
   const initialDataRef = useRef(initialData);
   const formIdRef = useRef(formId);
   const onSaveDraftRef = useRef(onSaveDraft);
@@ -100,58 +99,8 @@ export function useUnsavedChanges<T>({
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [contextIsDirty, enabled]);
 
-  // Handle browser back/forward buttons
-  const pathname = usePathname();
-  const isHandlingNavigation = useRef(false);
-  const formDataRef = useRef(formData);
-  const confirmNavigationRef = useRef(confirmNavigation);
-  const allowNavigationRef = useRef(allowNavigation);
-
-  // Keep refs in sync (synchronously where possible)
-  formDataRef.current = formData;
-  confirmNavigationRef.current = confirmNavigation;
-  allowNavigationRef.current = allowNavigation;
-
-  // Push a guard history state on mount and whenever we're on a form page
-  useEffect(() => {
-    if (!enabled) return;
-
-    // Always push a guard state so we can intercept back button
-    window.history.pushState({ formGuard: true, path: pathname }, '');
-
-    return () => {
-      // Don't clean up history state - browser handles it
-    };
-  }, [enabled, pathname]);
-
-  // Handle popstate (back/forward button)
-  useEffect(() => {
-    if (!enabled) return;
-
-    const handlePopState = (event: PopStateEvent) => {
-      // If we're in the middle of a confirmed navigation, let it through
-      if (isHandlingNavigation.current) {
-        isHandlingNavigation.current = false;
-        return;
-      }
-
-      // Push state back to prevent navigation, then let confirmNavigation decide
-      // This matches how sidebar navigation works - confirmNavigation checks its own dirty state
-      window.history.pushState({ formGuard: true, path: pathname }, '');
-
-      // Use confirmNavigation which uses the same dirty check as sidebar
-      // It will either proceed immediately (if not dirty) or show the modal
-      confirmNavigationRef.current(() => {
-        isHandlingNavigation.current = true;
-        allowNavigationRef.current();
-        // Go back twice: once for the guard state we just pushed, once for actual back
-        window.history.go(-2);
-      });
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [enabled, pathname]);
+  // Note: Browser back/forward button handling is now done at the context level
+  // in UnsavedChangesContext.tsx to ensure it's always active
 
   const markClean = useCallback(() => {
     markFormDirty(formIdRef.current, false);

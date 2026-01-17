@@ -188,9 +188,10 @@ export async function deleteJob(id: string): Promise<void> {
   await base(TABLES.JOBS).destroy(id);
 }
 
-// Get jobs for this week (Sunday to Saturday)
+// Get jobs for this week (Sunday to Saturday) - fetch all and filter client-side to avoid timezone issues
 export async function getJobsThisWeek(): Promise<Job[]> {
   try {
+    const allJobs = await getJobs();
     const today = new Date();
     // Get start of week (Sunday)
     const startOfWeek = new Date(today);
@@ -202,11 +203,12 @@ export async function getJobsThisWeek(): Promise<Job[]> {
     endOfWeek.setDate(startOfWeek.getDate() + 6);
     endOfWeek.setHours(23, 59, 59, 999);
 
-    const startDate = startOfWeek.toISOString().split('T')[0];
-    const endDate = endOfWeek.toISOString().split('T')[0];
-
-    const formula = `AND({Date} >= '${startDate}', {Date} <= '${endDate}')`;
-    return await getJobs({ filterByFormula: formula });
+    return allJobs.filter(job => {
+      if (!job.fields.Date) return false;
+      // Parse date as local date (add T12:00:00 to avoid timezone shifts)
+      const jobDate = new Date(job.fields.Date + 'T12:00:00');
+      return jobDate >= startOfWeek && jobDate <= endOfWeek;
+    });
   } catch (error) {
     console.error('Error getting jobs this week:', error);
     return [];
@@ -239,18 +241,22 @@ export async function getUnassignedJobs(): Promise<Job[]> {
   return getJobs({ filterByFormula: formula });
 }
 
-// Get jobs for this month
+// Get jobs for this month (fetch all and filter client-side to avoid Airtable date formula timezone issues)
 export async function getJobsThisMonth(): Promise<Job[]> {
   try {
+    const allJobs = await getJobs();
     const today = new Date();
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    firstDay.setHours(0, 0, 0, 0);
     const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    lastDay.setHours(23, 59, 59, 999);
 
-    const startDate = firstDay.toISOString().split('T')[0];
-    const endDate = lastDay.toISOString().split('T')[0];
-
-    const formula = `AND({Date} >= '${startDate}', {Date} <= '${endDate}')`;
-    return await getJobs({ filterByFormula: formula });
+    return allJobs.filter(job => {
+      if (!job.fields.Date) return false;
+      // Parse date as local date (add T12:00:00 to avoid timezone shifts)
+      const jobDate = new Date(job.fields.Date + 'T12:00:00');
+      return jobDate >= firstDay && jobDate <= lastDay;
+    });
   } catch (error) {
     console.error('Error getting jobs this month:', error);
     return [];
@@ -760,16 +766,42 @@ export async function getDashboardMetrics() {
   const activeClients = allClients.filter(c => c.fields.Status === 'Active');
   const activeCleaners = allCleaners.filter(c => c.fields.Status === 'Active');
 
+  // Helper to safely get numeric value (handles arrays from Airtable lookups)
+  const safeNumber = (value: number | number[] | undefined | null): number => {
+    if (value === undefined || value === null) return 0;
+    if (Array.isArray(value)) return value[0] || 0;
+    if (typeof value === 'number' && !isNaN(value)) return value;
+    return 0;
+  };
+
   // Expected monthly revenue from all jobs scheduled this month
-  const expectedMonthlyRevenue = thisMonthJobs.reduce((sum, job) => sum + (job.fields['Amount Charged'] || 0), 0);
+  const expectedMonthlyRevenue = thisMonthJobs.reduce((sum, job) => sum + safeNumber(job.fields['Amount Charged']), 0);
   const avgQualityScore = activeCleaners.length > 0
-    ? activeCleaners.reduce((sum, cleaner) => sum + (cleaner.fields['Average Quality Score'] || 0), 0) / activeCleaners.length
+    ? activeCleaners.reduce((sum, cleaner) => sum + safeNumber(cleaner.fields['Average Quality Score']), 0) / activeCleaners.length
     : 0;
+
+  // Calculate profit as Revenue - (Duration Hours × Cleaner Hourly Rate)
+  const thisWeekRevenue = thisWeekJobs.reduce((sum, job) => sum + safeNumber(job.fields['Amount Charged']), 0);
+  const thisWeekCleanerPayout = thisWeekJobs.reduce((sum, job) => {
+    const hours = safeNumber(job.fields['Duration Hours']);
+    const rate = safeNumber(job.fields['Cleaner Hourly Rate']);
+    return sum + (hours * rate);
+  }, 0);
+  const thisWeekProfit = thisWeekRevenue - thisWeekCleanerPayout;
+
+  const thisMonthCleanerPayout = thisMonthJobs.reduce((sum, job) => {
+    const hours = safeNumber(job.fields['Duration Hours']);
+    const rate = safeNumber(job.fields['Cleaner Hourly Rate']);
+    return sum + (hours * rate);
+  }, 0);
+  const thisMonthProfit = expectedMonthlyRevenue - thisMonthCleanerPayout;
 
   return {
     thisWeekJobsCount: thisWeekJobs.length,
-    thisWeekRevenue: thisWeekJobs.reduce((sum, job) => sum + (job.fields['Amount Charged'] || 0), 0),
+    thisWeekRevenue,
+    thisWeekProfit,
     expectedMonthlyRevenue,
+    thisMonthProfit,
     thisMonthJobsCount: thisMonthJobs.length,
     activeClientsCount: activeClients.length,
     activeCleanersCount: activeCleaners.length,
