@@ -208,11 +208,12 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
     notes: client?.fields.Notes || '',
   }), [client?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Unsaved changes detection
+  // Unsaved changes detection - only for editing existing clients (draft save handles new)
   const { markClean } = useUnsavedChanges({
     formId: `client-${client?.id || 'new'}`,
     formData,
     initialData,
+    enabled: !!client,
   });
 
   // Draft save functionality - only for new clients

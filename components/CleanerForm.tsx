@@ -155,11 +155,12 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
     color: cleaner?.fields.Color || '',
   }), [cleaner?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Unsaved changes detection
+  // Unsaved changes detection - only for editing existing cleaners (draft save handles new)
   const { markClean } = useUnsavedChanges({
     formId: `cleaner-${cleaner?.id || 'new'}`,
     formData,
     initialData,
+    enabled: !!cleaner,
   });
 
   // Draft save functionality - only for new cleaners

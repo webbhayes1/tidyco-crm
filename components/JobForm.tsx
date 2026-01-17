@@ -75,11 +75,12 @@ export function JobForm({ job, onSave, onCancel }: JobFormProps) {
     notes: job?.fields.Notes || '',
   }), [job?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Unsaved changes detection
+  // Unsaved changes detection - only for editing existing jobs
   const { markClean } = useUnsavedChanges({
     formId: `job-${job?.id || 'new'}`,
     formData,
     initialData,
+    enabled: !!job, // Only enable for editing, not for new jobs
   });
 
   // Draft save functionality - only for new jobs

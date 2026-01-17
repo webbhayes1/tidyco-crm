@@ -39,11 +39,12 @@ export function InvoiceForm({ invoice, initialData, onSave, onCancel }: InvoiceF
     status: invoice?.fields.Status || initialData?.Status || 'Pending',
   }), [invoice?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Unsaved changes detection
+  // Unsaved changes detection - only for editing existing invoices
   const { markClean } = useUnsavedChanges({
     formId: `invoice-${invoice?.id || 'new'}`,
     formData,
     initialData: initialFormState,
+    enabled: !!invoice, // Only enable for editing, not for new invoices
   });
 
   // Fetch clients for dropdown
