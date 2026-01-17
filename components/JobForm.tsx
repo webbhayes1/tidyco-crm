@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Job, Client, Cleaner, Team } from '@/types/airtable';
 import { Users2 } from 'lucide-react';
 import { AddressAutocomplete } from './AddressAutocomplete';
-import { DraftRestoreModal } from './DraftRestoreModal';
+import { DraftIndicator } from './DraftIndicator';
 import { useDraftSave } from '@/hooks/useDraftSave';
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
 
@@ -91,24 +91,16 @@ export function JobForm({ job, onSave, onCancel }: JobFormProps) {
     enabled: isNewJob,
   });
 
-  const [showDraftModal, setShowDraftModal] = useState(false);
-
-  useEffect(() => {
-    if (hasDraft && draftData && isNewJob) {
-      setShowDraftModal(true);
-    }
-  }, [hasDraft, draftData, isNewJob]);
-
+  // Restore draft data
   const handleRestoreDraft = useCallback(() => {
     if (draftData) {
       setFormData(draftData as typeof formData);
     }
-    setShowDraftModal(false);
   }, [draftData]);
 
-  const handleDiscardDraft = useCallback(() => {
+  // Delete draft
+  const handleDeleteDraft = useCallback(() => {
     clearDraft();
-    setShowDraftModal(false);
   }, [clearDraft]);
 
   // Toggle day selection for recurring jobs
@@ -236,15 +228,17 @@ export function JobForm({ job, onSave, onCancel }: JobFormProps) {
   };
 
   return (
-    <>
-      <DraftRestoreModal
-        isOpen={showDraftModal}
-        entityType="job"
-        onRestore={handleRestoreDraft}
-        onDiscard={handleDiscardDraft}
-      />
-
       <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Draft Indicator - shows when a draft is available */}
+      {isNewJob && (
+        <DraftIndicator
+          entityType="job"
+          hasDraft={hasDraft}
+          onRestore={handleRestoreDraft}
+          onDelete={handleDeleteDraft}
+        />
+      )}
+
       {/* Client Section */}
       <div className="bg-white p-6 rounded-lg border border-gray-200 space-y-4">
         <h3 className="font-semibold text-lg">Client</h3>
@@ -735,6 +729,5 @@ export function JobForm({ job, onSave, onCancel }: JobFormProps) {
         </button>
       </div>
     </form>
-    </>
   );
 }

@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import type { Cleaner } from '@/types/airtable';
 import { AddressAutocomplete } from './AddressAutocomplete';
-import { DraftRestoreModal } from './DraftRestoreModal';
+import { DraftIndicator } from './DraftIndicator';
 import { useDraftSave } from '@/hooks/useDraftSave';
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
 
@@ -171,24 +171,16 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
     enabled: isNewCleaner,
   });
 
-  const [showDraftModal, setShowDraftModal] = useState(false);
-
-  useEffect(() => {
-    if (hasDraft && draftData && isNewCleaner) {
-      setShowDraftModal(true);
-    }
-  }, [hasDraft, draftData, isNewCleaner]);
-
+  // Restore draft data
   const handleRestoreDraft = useCallback(() => {
     if (draftData) {
       setFormData(draftData as typeof formData);
     }
-    setShowDraftModal(false);
   }, [draftData]);
 
-  const handleDiscardDraft = useCallback(() => {
+  // Delete draft
+  const handleDeleteDraft = useCallback(() => {
     clearDraft();
-    setShowDraftModal(false);
   }, [clearDraft]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -275,15 +267,17 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
   };
 
   return (
-    <>
-      <DraftRestoreModal
-        isOpen={showDraftModal}
-        entityType="cleaner"
-        onRestore={handleRestoreDraft}
-        onDiscard={handleDiscardDraft}
-      />
-
       <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Draft Indicator - shows when a draft is available */}
+      {isNewCleaner && (
+        <DraftIndicator
+          entityType="cleaner"
+          hasDraft={hasDraft}
+          onRestore={handleRestoreDraft}
+          onDelete={handleDeleteDraft}
+        />
+      )}
+
       {/* Contact Information */}
       <div className="bg-white p-6 rounded-lg border border-gray-200 space-y-4">
         <h3 className="font-semibold text-lg">Contact Information</h3>
@@ -621,6 +615,5 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
         </button>
       </div>
     </form>
-    </>
   );
 }

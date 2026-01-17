@@ -31,6 +31,12 @@ export function useDraftSave<T>({
   const [draftData, setDraftData] = useState<T | null>(null);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   const storageKey = getStorageKey(key);
+  const dataRef = useRef(data);
+
+  // Keep dataRef current for event handlers
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
   // Check for existing draft on mount
   useEffect(() => {
@@ -82,6 +88,41 @@ export function useDraftSave<T>({
       }
     };
   }, [data, storageKey, debounceMs, enabled]);
+
+  // Save draft on page unload (refresh, close tab, navigate away)
+  useEffect(() => {
+    if (!enabled) return;
+
+    const saveCurrentDraft = () => {
+      try {
+        const toStore = {
+          data: dataRef.current,
+          timestamp: Date.now(),
+        };
+        localStorage.setItem(storageKey, JSON.stringify(toStore));
+      } catch (e) {
+        console.error('Error saving draft on navigation:', e);
+      }
+    };
+
+    // Save draft before page unload (refresh, close tab)
+    const handleBeforeUnload = () => {
+      saveCurrentDraft();
+    };
+
+    // Save draft on back/forward button
+    const handlePopState = () => {
+      saveCurrentDraft();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [storageKey, enabled]);
 
   // Save draft immediately (e.g., before navigation)
   const saveDraft = useCallback(() => {

@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Lead } from '@/types/airtable';
 import { AddressAutocomplete } from './AddressAutocomplete';
-import { DraftRestoreModal } from './DraftRestoreModal';
+import { DraftIndicator } from './DraftIndicator';
 import { useDraftSave } from '@/hooks/useDraftSave';
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
 
@@ -72,24 +72,16 @@ export function LeadForm({ initialData, onSave, onCancel }: LeadFormProps) {
     enabled: isNewLead,
   });
 
-  const [showDraftModal, setShowDraftModal] = useState(false);
-
-  useEffect(() => {
-    if (hasDraft && draftData && isNewLead) {
-      setShowDraftModal(true);
-    }
-  }, [hasDraft, draftData, isNewLead]);
-
+  // Restore draft data
   const handleRestoreDraft = useCallback(() => {
     if (draftData) {
       setFormData(draftData as Lead['fields']);
     }
-    setShowDraftModal(false);
   }, [draftData]);
 
-  const handleDiscardDraft = useCallback(() => {
+  // Delete draft
+  const handleDeleteDraft = useCallback(() => {
     clearDraft();
-    setShowDraftModal(false);
   }, [clearDraft]);
 
   const handleChange = (
@@ -134,15 +126,17 @@ export function LeadForm({ initialData, onSave, onCancel }: LeadFormProps) {
   };
 
   return (
-    <>
-      <DraftRestoreModal
-        isOpen={showDraftModal}
-        entityType="lead"
-        onRestore={handleRestoreDraft}
-        onDiscard={handleDiscardDraft}
-      />
-
       <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Draft Indicator - shows when a draft is available */}
+      {isNewLead && (
+        <DraftIndicator
+          entityType="lead"
+          hasDraft={hasDraft}
+          onRestore={handleRestoreDraft}
+          onDelete={handleDeleteDraft}
+        />
+      )}
+
       {error && (
         <div className="bg-red-50 p-4 rounded-lg border border-red-200">
           <p className="text-red-800">{error}</p>
@@ -462,6 +456,5 @@ export function LeadForm({ initialData, onSave, onCancel }: LeadFormProps) {
         </button>
       </div>
     </form>
-    </>
   );
 }
