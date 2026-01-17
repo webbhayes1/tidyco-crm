@@ -245,6 +245,7 @@ export function MarkPaidButton({
                       className="mt-1 block w-full rounded-md border-0 py-2 px-3 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
                     >
                       <option value="Zelle">Zelle</option>
+                      <option value="Venmo">Venmo</option>
                       <option value="Cash">Cash</option>
                       <option value="Square">Square</option>
                       <option value="Credit Card">Credit Card</option>

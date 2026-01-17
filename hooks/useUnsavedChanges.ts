@@ -9,6 +9,9 @@ interface UseUnsavedChangesOptions<T> {
   formData: T;
   initialData: T;
   enabled?: boolean;
+  formType?: 'edit' | 'draft';
+  entityType?: string;
+  onSaveDraft?: () => void;
 }
 
 interface UseUnsavedChangesReturn {
@@ -36,22 +39,42 @@ export function useUnsavedChanges<T>({
   formData,
   initialData,
   enabled = true,
+  formType = 'edit',
+  entityType,
+  onSaveDraft,
 }: UseUnsavedChangesOptions<T>): UseUnsavedChangesReturn {
-  const { registerForm, unregisterForm, markFormDirty, isDirty: contextIsDirty, confirmNavigation, allowNavigation } = useUnsavedChangesContext();
+  const { registerForm, unregisterForm, updateFormCallback, markFormDirty, isDirty: contextIsDirty, confirmNavigation, allowNavigation } = useUnsavedChangesContext();
   const initialDataRef = useRef(initialData);
   const formIdRef = useRef(formId);
+  const onSaveDraftRef = useRef(onSaveDraft);
+
+  // Keep onSaveDraft ref current
+  useEffect(() => {
+    onSaveDraftRef.current = onSaveDraft;
+  }, [onSaveDraft]);
+
+  // Create a stable wrapper that always calls the latest onSaveDraft
+  const stableSaveDraft = useCallback(() => {
+    onSaveDraftRef.current?.();
+  }, []);
 
   // Register form on mount, unregister on unmount
   useEffect(() => {
     if (!enabled) return;
 
-    registerForm(formId);
+    registerForm(formId, formType, entityType, stableSaveDraft);
     formIdRef.current = formId;
 
     return () => {
       unregisterForm(formIdRef.current);
     };
-  }, [formId, enabled, registerForm, unregisterForm]);
+  }, [formId, enabled, formType, entityType, registerForm, unregisterForm, stableSaveDraft]);
+
+  // Update the callback when onSaveDraft changes (the ref is updated, but we need to notify context)
+  useEffect(() => {
+    if (!enabled || !onSaveDraft) return;
+    updateFormCallback(formId, stableSaveDraft);
+  }, [formId, enabled, onSaveDraft, updateFormCallback, stableSaveDraft]);
 
   // Update dirty state when formData changes
   useEffect(() => {
@@ -79,52 +102,60 @@ export function useUnsavedChanges<T>({
 
   // Handle browser back/forward buttons
   const pathname = usePathname();
-  const hasAddedHistoryState = useRef(false);
-  const isNavigatingBack = useRef(false);
+  const isHandlingNavigation = useRef(false);
+  const formDataRef = useRef(formData);
+  const confirmNavigationRef = useRef(confirmNavigation);
+  const allowNavigationRef = useRef(allowNavigation);
 
+  // Keep refs in sync (synchronously where possible)
+  formDataRef.current = formData;
+  confirmNavigationRef.current = confirmNavigation;
+  allowNavigationRef.current = allowNavigation;
+
+  // Push a guard history state on mount and whenever we're on a form page
   useEffect(() => {
     if (!enabled) return;
 
-    // When form becomes dirty, push a history state to intercept back button
-    if (contextIsDirty && !hasAddedHistoryState.current) {
-      window.history.pushState({ unsavedChanges: true, path: pathname }, '');
-      hasAddedHistoryState.current = true;
-    }
+    // Always push a guard state so we can intercept back button
+    window.history.pushState({ formGuard: true, path: pathname }, '');
 
-    // When form becomes clean, reset the flag
-    if (!contextIsDirty) {
-      hasAddedHistoryState.current = false;
-    }
-  }, [contextIsDirty, enabled, pathname]);
+    return () => {
+      // Don't clean up history state - browser handles it
+    };
+  }, [enabled, pathname]);
 
+  // Handle popstate (back/forward button)
   useEffect(() => {
     if (!enabled) return;
 
-    const handlePopState = () => {
-      // If we're already handling a confirmed navigation, let it through
-      if (isNavigatingBack.current) {
-        isNavigatingBack.current = false;
+    const handlePopState = (event: PopStateEvent) => {
+      // If we're in the middle of a confirmed navigation, let it through
+      if (isHandlingNavigation.current) {
+        isHandlingNavigation.current = false;
         return;
       }
 
-      // If form is dirty and user pressed back
-      if (contextIsDirty) {
-        // Push the state back to prevent navigation
-        window.history.pushState({ unsavedChanges: true, path: pathname }, '');
+      // Check if form is dirty
+      const isDirty = isFormDirty(formDataRef.current, initialDataRef.current);
 
-        // Show confirmation via context
-        confirmNavigation(() => {
-          isNavigatingBack.current = true;
-          allowNavigation();
-          // Go back twice: once for the state we just pushed, once for the actual back
+      if (isDirty) {
+        // Prevent the navigation by pushing state back
+        window.history.pushState({ formGuard: true, path: pathname }, '');
+
+        // Show confirmation modal
+        confirmNavigationRef.current(() => {
+          isHandlingNavigation.current = true;
+          allowNavigationRef.current();
+          // Go back twice: once for the guard state we just pushed, once for actual back
           window.history.go(-2);
         });
       }
+      // If not dirty, let the navigation happen naturally
     };
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [contextIsDirty, enabled, pathname, confirmNavigation, allowNavigation]);
+  }, [enabled, pathname]);
 
   const markClean = useCallback(() => {
     markFormDirty(formIdRef.current, false);

@@ -6,6 +6,7 @@ import { AddressAutocomplete } from './AddressAutocomplete';
 import { DraftIndicator } from './DraftIndicator';
 import { useDraftSave } from '@/hooks/useDraftSave';
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
+import { TimeSelect } from './TimeSelect';
 
 interface CleanerFormProps {
   cleaner?: Cleaner;
@@ -16,13 +17,6 @@ interface CleanerFormProps {
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
 type DayOfWeek = typeof DAYS_OF_WEEK[number];
 
-const TIME_OPTIONS = [
-  '6:00 AM', '6:30 AM', '7:00 AM', '7:30 AM', '8:00 AM', '8:30 AM',
-  '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
-  '12:00 PM', '12:30 PM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM',
-  '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM', '5:00 PM', '5:30 PM',
-  '6:00 PM', '6:30 PM', '7:00 PM', '7:30 PM', '8:00 PM', '8:30 PM', '9:00 PM'
-];
 
 // Predefined color palette for cleaners (Google Calendar-like colors)
 const CLEANER_COLOR_PALETTE = [
@@ -155,17 +149,9 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
     color: cleaner?.fields.Color || '',
   }), [cleaner?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Unsaved changes detection - only for editing existing cleaners (draft save handles new)
-  const { markClean } = useUnsavedChanges({
-    formId: `cleaner-${cleaner?.id || 'new'}`,
-    formData,
-    initialData,
-    enabled: !!cleaner,
-  });
-
   // Draft save functionality - only for new cleaners
   const isNewCleaner = !cleaner;
-  const { hasDraft, draftData, clearDraft } = useDraftSave({
+  const { hasDraft, draftData, clearDraft, saveDraft } = useDraftSave({
     key: 'new-cleaner',
     data: formData,
     enabled: isNewCleaner,
@@ -182,6 +168,17 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
   const handleDeleteDraft = useCallback(() => {
     clearDraft();
   }, [clearDraft]);
+
+  // Navigation guard - different behavior for new vs edit
+  const { markClean } = useUnsavedChanges({
+    formId: `cleaner-${cleaner?.id || 'new'}`,
+    formData,
+    initialData,
+    enabled: true,
+    formType: isNewCleaner ? 'draft' : 'edit',
+    entityType: 'cleaner',
+    onSaveDraft: saveDraft,
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -532,25 +529,17 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
 
               {schedule[day].enabled ? (
                 <div className="flex items-center gap-2 flex-1">
-                  <select
+                  <TimeSelect
                     value={schedule[day].startTime}
-                    onChange={(e) => updateDayTime(day, 'startTime', e.target.value)}
-                    className="px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-white"
-                  >
-                    {TIME_OPTIONS.map(time => (
-                      <option key={time} value={time}>{time}</option>
-                    ))}
-                  </select>
+                    onChange={(value) => updateDayTime(day, 'startTime', value)}
+                    format="12h"
+                  />
                   <span className="text-gray-500">to</span>
-                  <select
+                  <TimeSelect
                     value={schedule[day].endTime}
-                    onChange={(e) => updateDayTime(day, 'endTime', e.target.value)}
-                    className="px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-white"
-                  >
-                    {TIME_OPTIONS.map(time => (
-                      <option key={time} value={time}>{time}</option>
-                    ))}
-                  </select>
+                    onChange={(value) => updateDayTime(day, 'endTime', value)}
+                    format="12h"
+                  />
                 </div>
               ) : (
                 <span className="text-sm text-gray-400 italic">Not available</span>

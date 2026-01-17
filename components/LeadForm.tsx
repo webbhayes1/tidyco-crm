@@ -56,17 +56,9 @@ export function LeadForm({ initialData, onSave, onCancel }: LeadFormProps) {
     'Next Follow-Up Date': initialData?.['Next Follow-Up Date'] || '',
   }), [initialData?.Name]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Unsaved changes detection - only for editing existing leads
-  const { markClean } = useUnsavedChanges({
-    formId: `lead-${initialData?.Name || 'new'}`,
-    formData,
-    initialData: initialFormData,
-    enabled: !!initialData?.Name, // Only enable for editing, not for new leads
-  });
-
   // Draft save functionality - only for new leads
   const isNewLead = !initialData?.Name;
-  const { hasDraft, draftData, clearDraft } = useDraftSave({
+  const { hasDraft, draftData, clearDraft, saveDraft } = useDraftSave({
     key: 'new-lead',
     data: formData,
     enabled: isNewLead,
@@ -83,6 +75,17 @@ export function LeadForm({ initialData, onSave, onCancel }: LeadFormProps) {
   const handleDeleteDraft = useCallback(() => {
     clearDraft();
   }, [clearDraft]);
+
+  // Navigation guard - different behavior for new vs edit
+  const { markClean } = useUnsavedChanges({
+    formId: `lead-${initialData?.Name || 'new'}`,
+    formData,
+    initialData: initialFormData,
+    enabled: true,
+    formType: isNewLead ? 'draft' : 'edit',
+    entityType: 'lead',
+    onSaveDraft: saveDraft,
+  });
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>

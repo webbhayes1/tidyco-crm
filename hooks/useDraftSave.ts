@@ -89,35 +89,7 @@ export function useDraftSave<T>({
     };
   }, [data, storageKey, debounceMs, enabled]);
 
-  // Save draft on page unload (refresh, close tab) and component unmount
-  useEffect(() => {
-    if (!enabled) return;
-
-    const saveCurrentDraft = () => {
-      try {
-        const toStore = {
-          data: dataRef.current,
-          timestamp: Date.now(),
-        };
-        localStorage.setItem(storageKey, JSON.stringify(toStore));
-      } catch (e) {
-        console.error('Error saving draft on navigation:', e);
-      }
-    };
-
-    // Save draft before page unload (refresh, close tab)
-    const handleBeforeUnload = () => {
-      saveCurrentDraft();
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    // Save draft when component unmounts (e.g., back button, navigation)
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      saveCurrentDraft(); // Save on unmount
-    };
-  }, [storageKey, enabled]);
+  // Note: Auto-save on unmount removed - forms now prompt user to save draft
 
   // Save draft immediately (e.g., before navigation)
   const saveDraft = useCallback(() => {

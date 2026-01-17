@@ -7,6 +7,7 @@ import { AddressAutocomplete } from './AddressAutocomplete';
 import { DraftIndicator } from './DraftIndicator';
 import { useDraftSave } from '@/hooks/useDraftSave';
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
+import { TimeSelect } from './TimeSelect';
 
 interface ClientFormProps {
   client?: Client;
@@ -46,14 +47,6 @@ function hasScheduleChanged(
 // Days of the week
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
 
-// Time options for schedule
-const TIME_OPTIONS = [
-  '6:00 AM', '6:30 AM', '7:00 AM', '7:30 AM', '8:00 AM', '8:30 AM',
-  '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
-  '12:00 PM', '12:30 PM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM',
-  '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM', '5:00 PM', '5:30 PM',
-  '6:00 PM', '6:30 PM', '7:00 PM', '7:30 PM', '8:00 PM'
-];
 
 // Common cities in the service area
 const CITY_SUGGESTIONS = [
@@ -208,20 +201,12 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
     notes: client?.fields.Notes || '',
   }), [client?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Unsaved changes detection - only for editing existing clients (draft save handles new)
-  const { markClean } = useUnsavedChanges({
-    formId: `client-${client?.id || 'new'}`,
-    formData,
-    initialData,
-    enabled: !!client,
-  });
-
   // Draft save functionality - only for new clients
-  const draftKey = client?.id ? `client-${client.id}` : 'new-client';
-  const { hasDraft, draftData, clearDraft } = useDraftSave({
-    key: draftKey,
+  const isNewClient = !client;
+  const { hasDraft, draftData, clearDraft, saveDraft } = useDraftSave({
+    key: 'new-client',
     data: formData,
-    enabled: !client, // Only save drafts for new clients
+    enabled: isNewClient,
   });
 
   // Restore draft data
@@ -235,6 +220,19 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
   const handleDeleteDraft = useCallback(() => {
     clearDraft();
   }, [clearDraft]);
+
+  // Navigation guard - different behavior for new vs edit
+  // For editing: shows "Leave without saving?" modal
+  // For new: shows "Save as draft?" modal
+  const { markClean } = useUnsavedChanges({
+    formId: `client-${client?.id || 'new'}`,
+    formData,
+    initialData,
+    enabled: true, // Always enabled
+    formType: isNewClient ? 'draft' : 'edit',
+    entityType: 'client',
+    onSaveDraft: saveDraft,
+  });
 
   // Build client data from form
   const buildClientData = (): Partial<Client['fields']> => {
@@ -405,7 +403,7 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
   return (
       <form onSubmit={handleSubmit} className="space-y-6">
       {/* Draft Indicator - shows when a draft is available */}
-      {!client && (
+      {isNewClient && (
         <DraftIndicator
           entityType="client"
           hasDraft={hasDraft}
@@ -698,6 +696,7 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
             >
               <option value="">Select method...</option>
               <option value="Zelle">Zelle</option>
+              <option value="Venmo">Venmo</option>
               <option value="Square">Square</option>
               <option value="Cash">Cash</option>
             </select>
@@ -867,25 +866,17 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
                 Time Range
               </label>
               <div className="flex items-center gap-3">
-                <select
+                <TimeSelect
                   value={formData.recurringStartTime}
-                  onChange={(e) => handleChange('recurringStartTime', e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg"
-                >
-                  {TIME_OPTIONS.map(time => (
-                    <option key={time} value={time}>{time}</option>
-                  ))}
-                </select>
+                  onChange={(value) => handleChange('recurringStartTime', value)}
+                  format="12h"
+                />
                 <span className="text-gray-500">to</span>
-                <select
+                <TimeSelect
                   value={formData.recurringEndTime}
-                  onChange={(e) => handleChange('recurringEndTime', e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg"
-                >
-                  {TIME_OPTIONS.map(time => (
-                    <option key={time} value={time}>{time}</option>
-                  ))}
-                </select>
+                  onChange={(value) => handleChange('recurringEndTime', value)}
+                  format="12h"
+                />
               </div>
             </div>
 

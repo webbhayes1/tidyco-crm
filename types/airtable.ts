@@ -15,7 +15,7 @@ export interface Client {
     'Zip Code'?: string;
     'Owner'?: 'Sean' | 'Webb';
     'Lead Source'?: 'Angi' | 'Referral' | 'Direct' | 'Google' | 'Facebook' | 'Thumbtack' | 'Other';
-    'Preferred Payment Method'?: 'Zelle' | 'Square' | 'Cash';
+    'Preferred Payment Method'?: 'Zelle' | 'Venmo' | 'Square' | 'Cash';
     'Has Left Review'?: boolean;
     'Booking History'?: string[]; // Array of Job record IDs
     'Total Bookings'?: number; // Count field
@@ -123,7 +123,9 @@ export interface Job {
     'Cleaner Rating'?: number;
     'Cleaner Review'?: string;
     'Photos'?: Array<{ url: string; filename: string }>;
-    'Notes'?: string;
+    'Notes'?: string; // Internal notes
+    'Entry Instructions'?: string; // Instructions for cleaners to enter the property
+    'Client Preferences'?: string; // Special requests and cleaning preferences
     'Client Email'?: string; // Lookup
     'Client Phone'?: string; // Lookup
     'Client Zip Code'?: string; // Lookup
@@ -174,7 +176,7 @@ export interface Payment {
     'Payment Date'?: string;
     'Payout Date'?: string;
     'Status': 'Pending' | 'Completed' | 'Refunded' | 'Failed';
-    'Payment Method'?: 'Zelle' | 'Square' | 'Cash' | 'Credit Card' | 'Check';
+    'Payment Method'?: 'Zelle' | 'Venmo' | 'Square' | 'Cash' | 'Credit Card' | 'Check';
     'Notes'?: string;
     'Created Date'?: string;
   };
@@ -189,7 +191,7 @@ export interface Income {
     'Client'?: string; // Lookup
     'Owner'?: string; // Lookup
     'Amount': number;
-    'Payment Method': 'Zelle' | 'Square' | 'Cash';
+    'Payment Method': 'Zelle' | 'Venmo' | 'Square' | 'Cash';
     'Category'?: 'Cleaning Service' | 'Tip' | 'Other';
     'Notes'?: string;
     'Created Date'?: string;
@@ -205,7 +207,7 @@ export interface Expense {
     'Description': string;
     'Amount': number;
     'Paid By': 'Sean' | 'Webb' | 'Business Account';
-    'Payment Method'?: 'Zelle' | 'Credit Card' | 'Cash' | 'Check';
+    'Payment Method'?: 'Zelle' | 'Venmo' | 'Credit Card' | 'Cash' | 'Check';
     'Related Job'?: string[]; // Job record IDs
     'Reimbursed'?: boolean;
     'Receipt'?: Array<{ url: string; filename: string }>;
@@ -391,7 +393,7 @@ export interface Invoice {
     'Rate': number;
     'Amount'?: number; // Calculated: Hours * Rate
     'Due Date'?: string;
-    'Payment Method'?: 'Zelle' | 'Square' | 'Cash' | 'Credit Card' | 'Check';
+    'Payment Method'?: 'Zelle' | 'Venmo' | 'Square' | 'Cash' | 'Credit Card' | 'Check';
     'Payment Date'?: string;
     'Notes'?: string;
     'Sent Date'?: string;

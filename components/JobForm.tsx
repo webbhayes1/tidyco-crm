@@ -7,6 +7,15 @@ import { AddressAutocomplete } from './AddressAutocomplete';
 import { DraftIndicator } from './DraftIndicator';
 import { useDraftSave } from '@/hooks/useDraftSave';
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
+import { TimeSelect, addHoursToTime, convertTo24h } from './TimeSelect';
+
+// Compare two time strings (24h format) - returns true if time1 is before or equal to time2
+function isTimeBefore(time1: string, time2: string): boolean {
+  if (!time1 || !time2) return false;
+  const t1 = convertTo24h(time1);
+  const t2 = convertTo24h(time2);
+  return t1 < t2;
+}
 
 // Days of the week for recurring selection
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
@@ -46,6 +55,8 @@ export function JobForm({ job, onSave, onCancel }: JobFormProps) {
     isRecurring: job?.fields['Is Recurring'] || false,
     recurrenceFrequency: job?.fields['Recurrence Frequency'] || undefined,
     recurringDay: job?.fields['Recurring Day'] || '',
+    entryInstructions: job?.fields['Entry Instructions'] || '',
+    clientPreferences: job?.fields['Client Preferences'] || '',
     notes: job?.fields.Notes || '',
   });
 
@@ -72,20 +83,14 @@ export function JobForm({ job, onSave, onCancel }: JobFormProps) {
     isRecurring: job?.fields['Is Recurring'] || false,
     recurrenceFrequency: job?.fields['Recurrence Frequency'] || undefined,
     recurringDay: job?.fields['Recurring Day'] || '',
+    entryInstructions: job?.fields['Entry Instructions'] || '',
+    clientPreferences: job?.fields['Client Preferences'] || '',
     notes: job?.fields.Notes || '',
   }), [job?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Unsaved changes detection - only for editing existing jobs
-  const { markClean } = useUnsavedChanges({
-    formId: `job-${job?.id || 'new'}`,
-    formData,
-    initialData,
-    enabled: !!job, // Only enable for editing, not for new jobs
-  });
-
   // Draft save functionality - only for new jobs
   const isNewJob = !job;
-  const { hasDraft, draftData, clearDraft } = useDraftSave({
+  const { hasDraft, draftData, clearDraft, saveDraft } = useDraftSave({
     key: 'new-job',
     data: formData,
     enabled: isNewJob,
@@ -103,11 +108,25 @@ export function JobForm({ job, onSave, onCancel }: JobFormProps) {
     clearDraft();
   }, [clearDraft]);
 
+  // Navigation guard - different behavior for new vs edit
+  const { markClean } = useUnsavedChanges({
+    formId: `job-${job?.id || 'new'}`,
+    formData,
+    initialData,
+    enabled: true,
+    formType: isNewJob ? 'draft' : 'edit',
+    entityType: 'job',
+    onSaveDraft: saveDraft,
+  });
+
   // Toggle day selection for recurring jobs
   const toggleDay = (day: string) => {
     // For now, just set a single day (can expand to multi-day later if needed)
     handleChange('recurringDay', formData.recurringDay === day ? '' : day);
   };
+
+  // Track if end time was manually set (don't auto-update if so)
+  const [endTimeManuallySet, setEndTimeManuallySet] = useState(!!job?.fields['End Time']);
 
   // Assignment type: 'individual' or 'team'
   const [assignmentType, setAssignmentType] = useState<'individual' | 'team'>(
@@ -184,7 +203,9 @@ export function JobForm({ job, onSave, onCancel }: JobFormProps) {
         'Is Recurring': formData.isRecurring,
         'Recurrence Frequency': formData.recurrenceFrequency,
         'Recurring Day': formData.recurringDay as Job['fields']['Recurring Day'] || undefined,
-        Notes: formData.notes,
+        'Entry Instructions': formData.entryInstructions || undefined,
+        'Client Preferences': formData.clientPreferences || undefined,
+        Notes: formData.notes || undefined,
       };
 
       markClean(); // Mark form as clean before navigation
@@ -202,7 +223,37 @@ export function JobForm({ job, onSave, onCancel }: JobFormProps) {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  // Auto-fill address fields when a client is selected
+  // Handle start time change - auto-update end time if not manually set
+  const handleStartTimeChange = (newStartTime: string) => {
+    handleChange('time', newStartTime);
+
+    // Auto-update end time to 1 hour later if not manually set
+    if (!endTimeManuallySet && newStartTime) {
+      const autoEndTime = addHoursToTime(newStartTime, 1);
+      handleChange('endTime', autoEndTime);
+    } else if (newStartTime && formData.endTime && !isTimeBefore(newStartTime, formData.endTime)) {
+      // If start time is moved past end time, adjust end time
+      const autoEndTime = addHoursToTime(newStartTime, 1);
+      handleChange('endTime', autoEndTime);
+    }
+  };
+
+  // Handle end time change - mark as manually set, validate not before start
+  const handleEndTimeChange = (newEndTime: string) => {
+    if (newEndTime && formData.time && isTimeBefore(newEndTime, formData.time)) {
+      // End time can't be before start time - set to start time + 1 hour
+      const correctedEndTime = addHoursToTime(formData.time, 1);
+      handleChange('endTime', correctedEndTime);
+      setEndTimeManuallySet(true);
+      return;
+    }
+    handleChange('endTime', newEndTime);
+    if (newEndTime) {
+      setEndTimeManuallySet(true);
+    }
+  };
+
+  // Auto-fill fields when a client is selected
   const handleClientChange = (clientId: string) => {
     handleChange('client', clientId);
 
@@ -222,6 +273,9 @@ export function JobForm({ job, onSave, onCancel }: JobFormProps) {
           clientHourlyRate: selectedClient.fields['Charge Per Cleaning']
             ? (selectedClient.fields['Charge Per Cleaning'] / (prev.durationHours || 2))
             : prev.clientHourlyRate,
+          entryInstructions: selectedClient.fields['Entry Instructions'] || prev.entryInstructions,
+          clientPreferences: selectedClient.fields.Preferences || prev.clientPreferences,
+          notes: selectedClient.fields.Notes || prev.notes,
         }));
       }
     }
@@ -410,12 +464,11 @@ export function JobForm({ job, onSave, onCancel }: JobFormProps) {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Start Time *
             </label>
-            <input
-              type="time"
-              required
+            <TimeSelect
               value={formData.time}
-              onChange={(e) => handleChange('time', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              onChange={handleStartTimeChange}
+              format="24h"
+              required
             />
           </div>
 
@@ -423,11 +476,10 @@ export function JobForm({ job, onSave, onCancel }: JobFormProps) {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               End Time
             </label>
-            <input
-              type="time"
+            <TimeSelect
               value={formData.endTime}
-              onChange={(e) => handleChange('endTime', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              onChange={handleEndTimeChange}
+              format="24h"
             />
           </div>
         </div>
@@ -696,16 +748,46 @@ export function JobForm({ job, onSave, onCancel }: JobFormProps) {
         </div>
       </div>
 
-      {/* Notes Section */}
+      {/* Additional Information Section */}
       <div className="bg-white p-6 rounded-lg border border-gray-200 space-y-4">
-        <h3 className="font-semibold text-lg">Notes</h3>
+        <h3 className="font-semibold text-lg">Additional Information</h3>
 
         <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Entry Instructions
+          </label>
+          <textarea
+            value={formData.entryInstructions}
+            onChange={(e) => handleChange('entryInstructions', e.target.value)}
+            placeholder="Gate codes, key locations, garage codes, how to access property..."
+            rows={3}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+          />
+          <p className="text-xs text-gray-500 mt-1">Instructions for cleaners to enter the property</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Client Preferences
+          </label>
+          <textarea
+            value={formData.clientPreferences}
+            onChange={(e) => handleChange('clientPreferences', e.target.value)}
+            placeholder="Any special requests, focus areas, cleaning preferences, etc."
+            rows={3}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Internal Notes
+          </label>
           <textarea
             value={formData.notes}
             onChange={(e) => handleChange('notes', e.target.value)}
-            placeholder="Any special requests, access instructions, or notes..."
-            rows={4}
+            placeholder="Internal notes about this job..."
+            rows={3}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg"
           />
         </div>

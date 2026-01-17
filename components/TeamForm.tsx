@@ -33,12 +33,17 @@ export function TeamForm({ team, onSave, onCancel }: TeamFormProps) {
     notes: team?.fields.Notes || '',
   }), [team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Unsaved changes detection - only for editing existing teams
+  // Check if this is a new team
+  const isNewTeam = !team;
+
+  // Unsaved changes detection - for both new and existing teams
   const { markClean } = useUnsavedChanges({
     formId: `team-${team?.id || 'new'}`,
     formData,
     initialData,
-    enabled: !!team, // Only enable for editing, not for new teams
+    enabled: true, // Always enabled
+    formType: isNewTeam ? 'draft' : 'edit',
+    entityType: 'team',
   });
 
   // Fetch active cleaners for selection
