@@ -1,7 +1,7 @@
 # Custom Next.js Portal - Status
 
 **Last Updated**: 2026-01-15
-**Session**: 22 (Auto-Generate Jobs Feature)
+**Session**: 29 (Cleaner Color Assignment Feature)
 **Progress**: Deployed to Production (100% complete)
 **Production URL**: https://tidyco-crm.vercel.app
 **GitHub Repo**: https://github.com/webbhayes1/tidyco-crm
@@ -226,6 +226,16 @@ custom/
 ---
 
 ## Session History
+
+### Session 29 (2026-01-15): Cleaner Color Assignment Feature ✅
+- **Cleaner Color field added to Airtable** (via MCP tools) - Field ID: fldh2j3OT3GmUIdQC
+- **Color picker on daily calendar sidebar** - Quick color change for each cleaner in "Show Cleaners" section
+- **CleanerColorPicker component** - Reusable client component with popover color palette
+- **CleanerJobsList component** - Jobs section with Upcoming/Past/All toggle
+- **Cleaner detail page** - Inline color editing without entering edit mode
+- **Cleaner form** - Visual color swatch selector (replaced dropdown)
+- **Cleaners list** - Color column as first column (colored circle)
+- **UI polish** - Proper spacing, hover effects, ring outlines for interactivity
 
 ### Session 22 (2026-01-15): Auto-Generate Jobs Feature ✅
 - **Auto-generate jobs from recurring schedule** - New feature on client edit page

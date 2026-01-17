@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { format, addDays, subDays } from 'date-fns';
+import { format, addDays, subDays, parseISO } from 'date-fns';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Plus, Settings, Mail, FileDown } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import type { Job, Cleaner } from '@/types/airtable';
@@ -92,7 +92,7 @@ export default function CalendarDailyPage() {
   const todayJobs = jobs.filter(job => {
     // Date filter
     if (!job.fields.Date) return false;
-    const jobDate = format(new Date(job.fields.Date), 'yyyy-MM-dd');
+    const jobDate = format(parseISO(job.fields.Date), 'yyyy-MM-dd');
     if (jobDate !== dateStr) return false;
 
     // Job type filter
@@ -431,7 +431,7 @@ export default function CalendarDailyPage() {
                             className="fixed inset-0 z-10"
                             onClick={() => setColorPickerOpen(null)}
                           />
-                          <div className="absolute left-0 top-7 z-20 bg-white rounded-lg shadow-lg border border-gray-200 p-3 grid grid-cols-4 gap-3">
+                          <div className="absolute left-0 top-7 z-20 bg-white rounded-lg shadow-lg border border-gray-200 p-3 grid grid-cols-4 gap-3 w-[172px]">
                             {CLEANER_COLOR_PALETTE.map(color => (
                               <button
                                 key={color.hex}

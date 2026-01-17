@@ -29,7 +29,8 @@ import {
   CheckCircle,
   XCircle,
   DollarSign,
-  RotateCcw
+  RotateCcw,
+  AlertCircle
 } from 'lucide-react';
 
 export default function LeadDetailPage() {
@@ -286,6 +287,19 @@ export default function LeadDetailPage() {
         {lead.fields['Lead Source'] && (
           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getSourceBadgeColor(lead.fields['Lead Source'])}`}>
             {lead.fields['Lead Source']}
+          </span>
+        )}
+        {/* Refund status badges */}
+        {lead.fields['Refund Requested'] && !lead.fields.Refunded && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
+            <AlertCircle className="h-3 w-3 mr-1" />
+            Request Refund
+          </span>
+        )}
+        {lead.fields.Refunded && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700">
+            <RotateCcw className="h-3 w-3 mr-1" />
+            Refunded
           </span>
         )}
         {leadTags.map(tag => (
@@ -639,9 +653,9 @@ export default function LeadDetailPage() {
 
           {/* Lead Fee (if exists) */}
           {lead.fields['Lead Fee'] && lead.fields['Lead Fee'] > 0 && (
-            <div className={`shadow sm:rounded-lg ${lead.fields.Refunded ? 'bg-gray-50' : 'bg-rose-50'}`}>
+            <div className={`shadow sm:rounded-lg ${lead.fields.Refunded ? 'bg-gray-50' : lead.fields['Refund Requested'] ? 'bg-orange-50' : 'bg-rose-50'}`}>
               <div className="px-4 py-5 sm:p-6">
-                <h3 className={`text-base font-medium mb-3 flex items-center gap-2 ${lead.fields.Refunded ? 'text-gray-700' : 'text-rose-900'}`}>
+                <h3 className={`text-base font-medium mb-3 flex items-center gap-2 ${lead.fields.Refunded ? 'text-gray-700' : lead.fields['Refund Requested'] ? 'text-orange-900' : 'text-rose-900'}`}>
                   <DollarSign className="h-5 w-5" />
                   Lead Fee
                 </h3>
@@ -650,18 +664,63 @@ export default function LeadDetailPage() {
                     <span className={`text-2xl font-bold ${lead.fields.Refunded ? 'text-gray-500 line-through' : 'text-rose-700'}`}>
                       ${lead.fields['Lead Fee'].toFixed(2)}
                     </span>
-                    {lead.fields.Refunded && (
-                      <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
-                        <RotateCcw className="h-3 w-3 mr-1" />
-                        Refunded
-                      </span>
-                    )}
+                    <div className="flex flex-col items-end gap-1">
+                      {lead.fields['Refund Requested'] && !lead.fields.Refunded && (
+                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-orange-100 text-orange-800">
+                          <AlertCircle className="h-3 w-3 mr-1" />
+                          Refund Requested
+                        </span>
+                      )}
+                      {lead.fields.Refunded && (
+                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-emerald-100 text-emerald-800">
+                          <RotateCcw className="h-3 w-3 mr-1" />
+                          Refunded
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  {lead.fields.Refunded && lead.fields['Refund Date'] && (
-                    <p className="text-sm text-gray-500">
-                      Refunded on {format(new Date(lead.fields['Refund Date']), 'MMM d, yyyy')}
-                    </p>
+
+                  {/* Refund Request Info */}
+                  {lead.fields['Refund Requested'] && !lead.fields.Refunded && (
+                    <div className="bg-orange-100 rounded-md p-3 space-y-2">
+                      {lead.fields['Refund Request Date'] && (
+                        <p className="text-sm text-orange-700">
+                          Requested on {format(new Date(lead.fields['Refund Request Date']), 'MMM d, yyyy')}
+                        </p>
+                      )}
+                      {lead.fields['Refund Request Note'] && (
+                        <div>
+                          <p className="text-xs font-medium text-orange-800 mb-1">Request Note:</p>
+                          <p className="text-sm text-orange-700 whitespace-pre-wrap">{lead.fields['Refund Request Note']}</p>
+                        </div>
+                      )}
+                    </div>
                   )}
+
+                  {/* Refund Info */}
+                  {lead.fields.Refunded && (
+                    <div className="bg-emerald-100 rounded-md p-3 space-y-2">
+                      {lead.fields['Refund Date'] && (
+                        <p className="text-sm text-emerald-700">
+                          Refunded on {format(new Date(lead.fields['Refund Date']), 'MMM d, yyyy')}
+                        </p>
+                      )}
+                      {lead.fields['Refund Note'] && (
+                        <div>
+                          <p className="text-xs font-medium text-emerald-800 mb-1">Refund Note:</p>
+                          <p className="text-sm text-emerald-700 whitespace-pre-wrap">{lead.fields['Refund Note']}</p>
+                        </div>
+                      )}
+                      {/* Show original request note if it exists */}
+                      {lead.fields['Refund Request Note'] && (
+                        <div className="pt-2 border-t border-emerald-200">
+                          <p className="text-xs font-medium text-emerald-800 mb-1">Original Request Note:</p>
+                          <p className="text-sm text-emerald-600 whitespace-pre-wrap">{lead.fields['Refund Request Note']}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {!lead.fields.Refunded && (
                     <button
                       onClick={async () => {

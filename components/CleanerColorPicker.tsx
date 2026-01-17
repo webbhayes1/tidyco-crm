@@ -74,7 +74,7 @@ export function CleanerColorPicker({ cleanerId, currentColor }: CleanerColorPick
               className="fixed inset-0 z-10"
               onClick={() => setIsOpen(false)}
             />
-            <div className="absolute left-0 top-8 z-20 bg-white rounded-lg shadow-lg border border-gray-200 p-3 grid grid-cols-4 gap-3">
+            <div className="absolute left-0 top-8 z-20 bg-white rounded-lg shadow-lg border border-gray-200 p-3 grid grid-cols-4 gap-3 w-[172px]">
               {CLEANER_COLOR_PALETTE.map((c) => (
                 <button
                   key={c.hex}

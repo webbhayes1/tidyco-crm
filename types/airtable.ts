@@ -346,8 +346,12 @@ export interface Lead {
     'Converted Client'?: string[]; // Client record ID when converted
     'Original Client'?: string[]; // Original client if churned re-entered as lead
     'Lead Fee'?: number; // Fee paid for this lead (e.g., Angi lead fee)
+    'Refund Requested'?: boolean; // Whether a refund has been requested
+    'Refund Request Date'?: string; // Date the refund was requested
+    'Refund Request Note'?: string; // Reason for requesting refund
     'Refunded'?: boolean; // Whether the lead fee was refunded
     'Refund Date'?: string; // Date the lead fee was refunded
+    'Refund Note'?: string; // Reason for the refund
     'Created Date'?: string;
     'Last Modified'?: string;
   };

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth, isSameDay } from 'date-fns';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth, isSameDay, parseISO } from 'date-fns';
 import { ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import type { Job, Cleaner } from '@/types/airtable';
@@ -55,7 +55,7 @@ export default function CalendarMonthlyPage() {
   // Filter jobs for current month
   const monthJobs = jobs.filter(job => {
     if (!job.fields.Date) return false;
-    const jobDate = new Date(job.fields.Date);
+    const jobDate = parseISO(job.fields.Date);
     return jobDate >= monthStart && jobDate <= monthEnd;
   });
 
@@ -63,7 +63,7 @@ export default function CalendarMonthlyPage() {
   const jobsByDay = new Map<string, EnrichedJob[]>();
   jobs.forEach(job => {
     if (!job.fields.Date) return;
-    const dayKey = format(new Date(job.fields.Date), 'yyyy-MM-dd');
+    const dayKey = format(parseISO(job.fields.Date), 'yyyy-MM-dd');
     if (!jobsByDay.has(dayKey)) {
       jobsByDay.set(dayKey, []);
     }

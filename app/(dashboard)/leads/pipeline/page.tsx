@@ -7,7 +7,7 @@ import { QuickStatusSelect } from '@/components/QuickStatusSelect';
 import { Lead } from '@/types/airtable';
 import { format } from 'date-fns';
 import Link from 'next/link';
-import { Plus, Upload, Phone, Mail, Link2, Copy, Check, ExternalLink, Search, X, Filter } from 'lucide-react';
+import { Plus, Upload, Phone, Mail, Link2, Copy, Check, ExternalLink, Search, X, Filter, DollarSign, RotateCcw, AlertCircle } from 'lucide-react';
 
 type LeadStatus = 'New' | 'Contacted' | 'Qualified' | 'Quote Sent' | 'Won' | 'Lost' | 'Churned';
 
@@ -72,11 +72,33 @@ export default function LeadsPage() {
       render: (lead) => (
         <div>
           <div className="font-medium text-gray-900">{lead.fields.Name}</div>
-          {lead.fields['Lead Source'] && (
-            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium mt-1 ${getSourceBadgeColor(lead.fields['Lead Source'])}`}>
-              {lead.fields['Lead Source']}
-            </span>
-          )}
+          <div className="flex flex-wrap items-center gap-1 mt-1">
+            {lead.fields['Lead Source'] && (
+              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getSourceBadgeColor(lead.fields['Lead Source'])}`}>
+                {lead.fields['Lead Source']}
+              </span>
+            )}
+            {/* Refund status badges */}
+            {lead.fields['Refund Requested'] && !lead.fields.Refunded && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
+                <AlertCircle className="h-3 w-3 mr-1" />
+                Request Refund
+              </span>
+            )}
+            {lead.fields.Refunded && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700">
+                <RotateCcw className="h-3 w-3 mr-1" />
+                Refunded
+              </span>
+            )}
+            {/* Lead fee badge (only show if not refunded and no request pending) */}
+            {lead.fields['Lead Fee'] && lead.fields['Lead Fee'] > 0 && !lead.fields.Refunded && !lead.fields['Refund Requested'] && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-700">
+                <DollarSign className="h-3 w-3 mr-0.5" />
+                {lead.fields['Lead Fee'].toFixed(2)}
+              </span>
+            )}
+          </div>
         </div>
       ),
     },
@@ -154,6 +176,9 @@ export default function LeadsPage() {
           statusType="lead"
           apiEndpoint="/api/leads"
           onSuccess={fetchLeads}
+          leadFee={lead.fields['Lead Fee']}
+          isRefundRequested={lead.fields['Refund Requested']}
+          isRefunded={lead.fields.Refunded}
         />
       ),
     },

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { format, addWeeks, subWeeks, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay } from 'date-fns';
+import { format, addWeeks, subWeeks, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import type { Job, Cleaner } from '@/types/airtable';
@@ -63,14 +63,14 @@ export default function CalendarWeeklyPage() {
   // Filter jobs for current week
   const weekJobs = jobs.filter(job => {
     if (!job.fields.Date) return false;
-    const jobDate = new Date(job.fields.Date);
+    const jobDate = parseISO(job.fields.Date);
     return jobDate >= weekStart && jobDate <= weekEnd;
   });
 
   // Group jobs by day
   const jobsByDay = new Map<string, EnrichedJob[]>();
   weekJobs.forEach(job => {
-    const jobDate = new Date(job.fields.Date!);
+    const jobDate = parseISO(job.fields.Date!);
     const dayKey = format(jobDate, 'yyyy-MM-dd');
 
     if (!jobsByDay.has(dayKey)) {
@@ -108,11 +108,11 @@ export default function CalendarWeeklyPage() {
   const busiestDay = weekDays.reduce((busiest, day) => {
     const dayKey = format(day, 'yyyy-MM-dd');
     const dayJobCount = weekJobs.filter(job =>
-      format(new Date(job.fields.Date!), 'yyyy-MM-dd') === dayKey
+      format(parseISO(job.fields.Date!), 'yyyy-MM-dd') === dayKey
     ).length;
 
     const busiestCount = weekJobs.filter(job =>
-      format(new Date(job.fields.Date!), 'yyyy-MM-dd') === format(busiest, 'yyyy-MM-dd')
+      format(parseISO(job.fields.Date!), 'yyyy-MM-dd') === format(busiest, 'yyyy-MM-dd')
     ).length;
 
     return dayJobCount > busiestCount ? day : busiest;
