@@ -209,12 +209,13 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
     enabled: isNewClient,
   });
 
-  // Restore draft data
+  // Restore draft data - clears draft from storage after restoring
   const handleRestoreDraft = useCallback(() => {
     if (draftData) {
       setFormData(draftData as typeof formData);
+      clearDraft(); // Hide banner and clear from storage
     }
-  }, [draftData]);
+  }, [draftData, clearDraft]);
 
   // Delete draft
   const handleDeleteDraft = useCallback(() => {

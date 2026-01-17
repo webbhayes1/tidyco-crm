@@ -96,12 +96,13 @@ export function JobForm({ job, onSave, onCancel }: JobFormProps) {
     enabled: isNewJob,
   });
 
-  // Restore draft data
+  // Restore draft data - clears draft from storage after restoring
   const handleRestoreDraft = useCallback(() => {
     if (draftData) {
       setFormData(draftData as typeof formData);
+      clearDraft(); // Hide banner and clear from storage
     }
-  }, [draftData]);
+  }, [draftData, clearDraft]);
 
   // Delete draft
   const handleDeleteDraft = useCallback(() => {

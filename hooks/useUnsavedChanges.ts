@@ -135,22 +135,18 @@ export function useUnsavedChanges<T>({
         return;
       }
 
-      // Check if form is dirty
-      const isDirty = isFormDirty(formDataRef.current, initialDataRef.current);
+      // Push state back to prevent navigation, then let confirmNavigation decide
+      // This matches how sidebar navigation works - confirmNavigation checks its own dirty state
+      window.history.pushState({ formGuard: true, path: pathname }, '');
 
-      if (isDirty) {
-        // Prevent the navigation by pushing state back
-        window.history.pushState({ formGuard: true, path: pathname }, '');
-
-        // Show confirmation modal
-        confirmNavigationRef.current(() => {
-          isHandlingNavigation.current = true;
-          allowNavigationRef.current();
-          // Go back twice: once for the guard state we just pushed, once for actual back
-          window.history.go(-2);
-        });
-      }
-      // If not dirty, let the navigation happen naturally
+      // Use confirmNavigation which uses the same dirty check as sidebar
+      // It will either proceed immediately (if not dirty) or show the modal
+      confirmNavigationRef.current(() => {
+        isHandlingNavigation.current = true;
+        allowNavigationRef.current();
+        // Go back twice: once for the guard state we just pushed, once for actual back
+        window.history.go(-2);
+      });
     };
 
     window.addEventListener('popstate', handlePopState);

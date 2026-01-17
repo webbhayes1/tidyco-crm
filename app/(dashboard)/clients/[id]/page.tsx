@@ -139,7 +139,10 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
                     <dt className="text-sm font-medium text-gray-500">Address</dt>
                     <dd className="mt-1 text-sm text-gray-900">
                       {client.fields.Address}
-                      {client.fields['Zip Code'] && `, ${client.fields['Zip Code']}`}
+                      {client.fields['Address Line 2'] && `, ${client.fields['Address Line 2']}`}
+                      {client.fields.City && <><br />{client.fields.City}</>}
+                      {client.fields.State && `, ${client.fields.State}`}
+                      {client.fields['Zip Code'] && ` ${client.fields['Zip Code']}`}
                     </dd>
                   </div>
                 </div>
