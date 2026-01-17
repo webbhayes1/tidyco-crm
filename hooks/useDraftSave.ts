@@ -89,7 +89,7 @@ export function useDraftSave<T>({
     };
   }, [data, storageKey, debounceMs, enabled]);
 
-  // Save draft on page unload (refresh, close tab, navigate away)
+  // Save draft on page unload (refresh, close tab) and component unmount
   useEffect(() => {
     if (!enabled) return;
 
@@ -110,17 +110,12 @@ export function useDraftSave<T>({
       saveCurrentDraft();
     };
 
-    // Save draft on back/forward button
-    const handlePopState = () => {
-      saveCurrentDraft();
-    };
-
     window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('popstate', handlePopState);
 
+    // Save draft when component unmounts (e.g., back button, navigation)
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      window.removeEventListener('popstate', handlePopState);
+      saveCurrentDraft(); // Save on unmount
     };
   }, [storageKey, enabled]);
 
