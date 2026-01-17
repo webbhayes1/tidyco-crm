@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { Team, Cleaner } from '@/types/airtable';
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
 
 interface TeamFormProps {
   team?: Team;
@@ -21,6 +22,22 @@ export function TeamForm({ team, onSave, onCancel }: TeamFormProps) {
     teamLead: team?.fields['Team Lead']?.[0] || '',
     status: team?.fields.Status || 'Active',
     notes: team?.fields.Notes || '',
+  });
+
+  // Capture initial data for unsaved changes detection
+  const initialData = useMemo(() => ({
+    teamName: team?.fields['Team Name'] || '',
+    members: team?.fields.Members || [],
+    teamLead: team?.fields['Team Lead']?.[0] || '',
+    status: team?.fields.Status || 'Active',
+    notes: team?.fields.Notes || '',
+  }), [team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Unsaved changes detection
+  const { markClean } = useUnsavedChanges({
+    formId: `team-${team?.id || 'new'}`,
+    formData,
+    initialData,
   });
 
   // Fetch active cleaners for selection
@@ -55,6 +72,7 @@ export function TeamForm({ team, onSave, onCancel }: TeamFormProps) {
         Notes: formData.notes || undefined,
       };
 
+      markClean(); // Mark form as clean before navigation
       await onSave(teamData);
     } catch (error) {
       console.error('Failed to save team:', error);

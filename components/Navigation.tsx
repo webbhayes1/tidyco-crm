@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { SafeLink } from './SafeLink';
 // import { UserButton } from '@clerk/nextjs'; // Temporarily disabled
 import {
   LayoutDashboard,
@@ -39,7 +39,7 @@ export function Navigation() {
                 const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
                 const Icon = item.icon;
                 return (
-                  <Link
+                  <SafeLink
                     key={item.name}
                     href={item.href}
                     className={`inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium ${
@@ -50,7 +50,7 @@ export function Navigation() {
                   >
                     <Icon className="mr-2 h-4 w-4" />
                     {item.name}
-                  </Link>
+                  </SafeLink>
                 );
               })}
             </div>

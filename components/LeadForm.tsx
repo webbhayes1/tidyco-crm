@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Lead } from '@/types/airtable';
 import { AddressAutocomplete } from './AddressAutocomplete';
 import { DraftRestoreModal } from './DraftRestoreModal';
 import { useDraftSave } from '@/hooks/useDraftSave';
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
 
 interface LeadFormProps {
   initialData?: Lead['fields'];
@@ -34,6 +35,33 @@ export function LeadForm({ initialData, onSave, onCancel }: LeadFormProps) {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Capture initial form data for unsaved changes detection
+  const initialFormData = useMemo(() => ({
+    Name: initialData?.Name || '',
+    Email: initialData?.Email || '',
+    Phone: initialData?.Phone || '',
+    Address: initialData?.Address || '',
+    City: initialData?.City || '',
+    State: initialData?.State || '',
+    'Zip Code': initialData?.['Zip Code'] || '',
+    'Lead Source': initialData?.['Lead Source'] || 'Angi',
+    'Angi Lead ID': initialData?.['Angi Lead ID'] || '',
+    'Service Type Interested': initialData?.['Service Type Interested'],
+    Bedrooms: initialData?.Bedrooms,
+    Bathrooms: initialData?.Bathrooms,
+    Status: initialData?.Status || 'New',
+    Owner: initialData?.Owner,
+    Notes: initialData?.Notes || '',
+    'Next Follow-Up Date': initialData?.['Next Follow-Up Date'] || '',
+  }), [initialData?.Name]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Unsaved changes detection
+  const { markClean } = useUnsavedChanges({
+    formId: `lead-${initialData?.Name || 'new'}`,
+    formData,
+    initialData: initialFormData,
+  });
 
   // Draft save functionality - only for new leads
   const isNewLead = !initialData?.Name;
@@ -94,6 +122,7 @@ export function LeadForm({ initialData, onSave, onCancel }: LeadFormProps) {
     setError(null);
 
     try {
+      markClean(); // Mark form as clean before navigation
       clearDraft();
       await onSave(formData);
     } catch (err) {

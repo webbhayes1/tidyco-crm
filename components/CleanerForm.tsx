@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Cleaner } from '@/types/airtable';
 import { AddressAutocomplete } from './AddressAutocomplete';
 import { DraftRestoreModal } from './DraftRestoreModal';
 import { useDraftSave } from '@/hooks/useDraftSave';
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
 
 interface CleanerFormProps {
   cleaner?: Cleaner;
@@ -136,6 +137,31 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
     parsePreferredHours(cleaner?.fields['Preferred Hours'], cleaner?.fields.Availability)
   );
 
+  // Capture initial data for unsaved changes detection
+  const initialData = useMemo(() => ({
+    name: cleaner?.fields.Name || '',
+    email: cleaner?.fields.Email || '',
+    phone: cleaner?.fields.Phone || '',
+    zellePaymentInfo: cleaner?.fields['Zelle Payment Info'] || '',
+    language: cleaner?.fields.Language || 'English',
+    status: cleaner?.fields.Status || 'Active',
+    hourlyRate: cleaner?.fields['Hourly Rate'] || 25,
+    experienceLevel: cleaner?.fields['Experience Level'] || 'Junior',
+    serviceAreaZipCodes: cleaner?.fields['Service Area Zip Codes'] || '',
+    notes: cleaner?.fields.Notes || '',
+    birthday: cleaner?.fields.Birthday || '',
+    workAnniversary: cleaner?.fields['Work Anniversary'] || '',
+    address: cleaner?.fields.Address || '',
+    color: cleaner?.fields.Color || '',
+  }), [cleaner?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Unsaved changes detection
+  const { markClean } = useUnsavedChanges({
+    formId: `cleaner-${cleaner?.id || 'new'}`,
+    formData,
+    initialData,
+  });
+
   // Draft save functionality - only for new cleaners
   const isNewCleaner = !cleaner;
   const { hasDraft, draftData, clearDraft } = useDraftSave({
@@ -195,6 +221,7 @@ export function CleanerForm({ cleaner, onSave, onCancel }: CleanerFormProps) {
         cleanerData.Email = formData.email;
       }
 
+      markClean(); // Mark form as clean before navigation
       clearDraft();
       await onSave(cleanerData);
     } catch (error) {

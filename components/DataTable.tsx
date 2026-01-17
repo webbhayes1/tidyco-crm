@@ -1,6 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
+import { useSafeRouter } from '@/hooks/useSafeRouter';
 
 export interface Column<T> {
   key: string;
@@ -23,6 +24,8 @@ export function DataTable<T extends Record<string, any>>({
   getRowHref,
   emptyMessage = 'No data available',
 }: DataTableProps<T>) {
+  const router = useSafeRouter();
+
   if (data.length === 0) {
     return (
       <div className="text-center py-12">
@@ -44,7 +47,7 @@ export function DataTable<T extends Record<string, any>>({
       return (
         <tr
           key={index}
-          onClick={() => window.location.href = href}
+          onClick={() => router.push(href)}
           className="hover:bg-gray-50 cursor-pointer"
         >
           {cells}

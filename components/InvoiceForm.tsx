@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { Invoice, Client } from '@/types/airtable';
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
 
 interface InvoiceFormProps {
   invoice?: Invoice;
@@ -24,6 +25,25 @@ export function InvoiceForm({ invoice, initialData, onSave, onCancel }: InvoiceF
     dueDate: invoice?.fields['Due Date'] || initialData?.['Due Date'] || '',
     notes: invoice?.fields.Notes || initialData?.Notes || '',
     status: invoice?.fields.Status || initialData?.Status || 'Pending',
+  });
+
+  // Capture initial form state for unsaved changes detection
+  const initialFormState = useMemo(() => ({
+    clientId: invoice?.fields.Client?.[0] || initialData?.Client?.[0] || '',
+    serviceDate: invoice?.fields['Service Date'] || initialData?.['Service Date'] || '',
+    serviceType: invoice?.fields['Service Type'] || initialData?.['Service Type'] || 'General Clean',
+    hours: invoice?.fields.Hours || initialData?.Hours || 0,
+    rate: invoice?.fields.Rate || initialData?.Rate || 50,
+    dueDate: invoice?.fields['Due Date'] || initialData?.['Due Date'] || '',
+    notes: invoice?.fields.Notes || initialData?.Notes || '',
+    status: invoice?.fields.Status || initialData?.Status || 'Pending',
+  }), [invoice?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Unsaved changes detection
+  const { markClean } = useUnsavedChanges({
+    formId: `invoice-${invoice?.id || 'new'}`,
+    formData,
+    initialData: initialFormState,
   });
 
   // Fetch clients for dropdown
@@ -73,6 +93,7 @@ export function InvoiceForm({ invoice, initialData, onSave, onCancel }: InvoiceF
 
     setLoading(true);
     try {
+      markClean(); // Mark form as clean before navigation
       await onSave({
         Client: [formData.clientId],
         'Service Date': formData.serviceDate,

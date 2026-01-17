@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Job, Client, Cleaner, Team } from '@/types/airtable';
 import { Users2 } from 'lucide-react';
 import { AddressAutocomplete } from './AddressAutocomplete';
 import { DraftRestoreModal } from './DraftRestoreModal';
 import { useDraftSave } from '@/hooks/useDraftSave';
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
 
 // Days of the week for recurring selection
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
@@ -46,6 +47,39 @@ export function JobForm({ job, onSave, onCancel }: JobFormProps) {
     recurrenceFrequency: job?.fields['Recurrence Frequency'] || undefined,
     recurringDay: job?.fields['Recurring Day'] || '',
     notes: job?.fields.Notes || '',
+  });
+
+  // Capture initial data for unsaved changes detection
+  const initialData = useMemo(() => ({
+    client: job?.fields.Client?.[0] || '',
+    selectedCleaners: job?.fields.Cleaner || [],
+    selectedTeam: job?.fields.Team?.[0] || '',
+    date: job?.fields.Date || '',
+    time: job?.fields.Time || '',
+    endTime: job?.fields['End Time'] || '',
+    serviceType: job?.fields['Service Type'] || 'General Clean',
+    address: job?.fields.Address || '',
+    addressLine2: job?.fields['Address Line 2'] || '',
+    city: job?.fields.City || '',
+    state: job?.fields.State || '',
+    zipCode: job?.fields['Zip Code'] || '',
+    bedrooms: job?.fields.Bedrooms || 0,
+    bathrooms: job?.fields.Bathrooms || 0,
+    durationHours: job?.fields['Duration Hours'] || 2,
+    clientHourlyRate: job?.fields['Client Hourly Rate'] || 0,
+    amountCharged: job?.fields['Amount Charged'] || 0,
+    status: job?.fields.Status || 'Scheduled',
+    isRecurring: job?.fields['Is Recurring'] || false,
+    recurrenceFrequency: job?.fields['Recurrence Frequency'] || undefined,
+    recurringDay: job?.fields['Recurring Day'] || '',
+    notes: job?.fields.Notes || '',
+  }), [job?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Unsaved changes detection
+  const { markClean } = useUnsavedChanges({
+    formId: `job-${job?.id || 'new'}`,
+    formData,
+    initialData,
   });
 
   // Draft save functionality - only for new jobs
@@ -160,6 +194,7 @@ export function JobForm({ job, onSave, onCancel }: JobFormProps) {
         Notes: formData.notes,
       };
 
+      markClean(); // Mark form as clean before navigation
       clearDraft();
       await onSave(jobData);
     } catch (error) {

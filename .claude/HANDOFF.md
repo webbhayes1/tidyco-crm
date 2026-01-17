@@ -1,78 +1,84 @@
-# Session 30 Handoff - 2026-01-16
+# Session 31 Handoff - 2026-01-16
 
 ## Session Summary
-Implemented full lead fee refund tracking with request workflow, notes, and visual status badges. Fixed calendar date parsing timezone bug.
+Implemented unsaved changes navigation guard across all forms. Users are now prompted to save or discard changes when navigating away from any edit page with unsaved modifications.
 
 ## What Was Accomplished
 
-### 1. Lead Fee Refund Request & Tracking (Full Implementation)
-**Purpose**: Allow tracking refund requests with notes before marking as refunded
+### Unsaved Changes Navigation Guard (Full Implementation)
+**Purpose**: Prevent accidental data loss by prompting users before navigating away from forms with unsaved changes
 
-**Airtable Fields Created** (via MCP tools):
-- `Refund Requested` (checkbox, yellowBright) - Whether a refund has been requested
-- `Refund Request Date` (date) - Date the refund was requested
-- `Refund Request Note` (multilineText) - Reason for requesting refund
-- `Refund Note` (multilineText) - Details about the refund
+**New Files Created**:
 
-**CRM Components Updated**:
+1. **`contexts/UnsavedChangesContext.tsx`** - Global context provider
+   - Tracks dirty state per form (by formId)
+   - Manages pending navigation callbacks
+   - Renders confirmation modal at top level
 
-- **QuickStatusSelect** (`components/QuickStatusSelect.tsx`)
-  - Added "Request Refund" option (orange) - opens note modal
-  - Added "Mark Refunded" option (emerald) - opens note modal
-  - Note modal requires text before submitting
-  - Props: `isRefundRequested`, `isRefunded`, `leadFee`
+2. **`components/UnsavedChangesModal.tsx`** - Confirmation dialog
+   - Amber AlertTriangle icon (matches existing modal style)
+   - "You have unsaved changes" heading
+   - "Stay" and "Leave Without Saving" buttons
 
-- **Pipeline Page** (`app/(dashboard)/leads/pipeline/page.tsx`)
-  - Added orange "Request Refund" badge next to lead name
-  - Added emerald "Refunded" badge next to lead name
-  - Lead fee badge only shows when no refund status
-  - Passes refund props to QuickStatusSelect
+3. **`hooks/useUnsavedChanges.ts`** - Per-form hook
+   - Takes formId, formData, initialData
+   - Compares current vs initial values to detect dirty state
+   - Handles beforeunload (browser refresh)
+   - Handles popstate (browser back/forward buttons)
+   - Returns `{ isDirty, markClean }`
 
-- **Lead Detail Page** (`app/(dashboard)/leads/[id]/page.tsx`)
-  - Added refund badges to Status & Tags row at top
-  - Lead Fee section has dynamic background color (rose → orange → gray)
-  - Shows "Refund Requested" panel with date and note
-  - Shows "Refunded" panel with date, note, and original request note
-  - "Mark as Refunded" button available until refunded
+4. **`components/SafeLink.tsx`** - Navigation-intercepting Link wrapper
+   - Wraps next/link
+   - Intercepts navigation when form is dirty
+   - Shows confirmation modal before proceeding
 
-### 2. Calendar Date Parsing Fix
-**Issue**: Jobs scheduled for the 20th were showing on the 19th
-**Cause**: `new Date("2026-01-20")` interprets as midnight UTC, shifts to previous day in local time
-**Fix**: Changed to `parseISO()` from date-fns which handles local dates correctly
+5. **`hooks/useSafeRouter.ts`** - Safe router wrapper
+   - Wraps useRouter
+   - Intercepts push/replace/back calls
+   - Shows confirmation when dirty
 
-**Files Fixed**:
-- `app/(dashboard)/calendar/daily/page.tsx`
-- `app/(dashboard)/calendar/weekly/page.tsx`
-- `app/(dashboard)/calendar/monthly/page.tsx`
+6. **`components/Providers.tsx`** - Client-side provider wrapper
+   - Wraps UnsavedChangesProvider
+   - Used in root layout (server component compatible)
 
-## Files Modified
-- `custom/components/QuickStatusSelect.tsx` - Refund request/mark refunded options with modal
-- `custom/app/(dashboard)/leads/pipeline/page.tsx` - Refund status badges, props to QuickStatusSelect
-- `custom/app/(dashboard)/leads/[id]/page.tsx` - Refund badges in Status row, Lead Fee section updates
-- `custom/types/airtable.ts` - Added refund request fields to Lead interface
-- `custom/app/(dashboard)/calendar/daily/page.tsx` - parseISO fix
-- `custom/app/(dashboard)/calendar/weekly/page.tsx` - parseISO fix
-- `custom/app/(dashboard)/calendar/monthly/page.tsx` - parseISO fix
+**Files Modified**:
+
+- **`app/layout.tsx`** - Wrapped with Providers component
+- **`components/Navigation.tsx`** - Uses SafeLink for sidebar navigation
+- **`components/DataTable.tsx`** - Uses useSafeRouter instead of window.location.href
+- **`components/ClientForm.tsx`** - Added useUnsavedChanges hook, markClean() on save
+- **`components/CleanerForm.tsx`** - Added useUnsavedChanges hook, markClean() on save
+- **`components/JobForm.tsx`** - Added useUnsavedChanges hook, markClean() on save
+- **`components/TeamForm.tsx`** - Added useUnsavedChanges hook, markClean() on save
+- **`components/LeadForm.tsx`** - Added useUnsavedChanges hook, markClean() on save
+- **`components/InvoiceForm.tsx`** - Added useUnsavedChanges hook, markClean() on save
+
+## Navigation Types Handled
+
+| Type | How It's Handled |
+|------|------------------|
+| Sidebar navigation (Link clicks) | SafeLink intercepts, shows modal |
+| Cancel button | useSafeRouter intercepts |
+| Save then navigate | markClean() called first, no modal |
+| DataTable row clicks | useSafeRouter instead of window.location |
+| Browser refresh (F5, Cmd+R) | beforeunload shows browser dialog |
+| Browser back/forward buttons | popstate handler intercepts, shows modal |
+
+## How It Works
+
+1. When a form mounts, it registers with the context and captures initial data
+2. As user types, form compares current values to initial - if different, marks dirty
+3. When dirty and user tries to navigate:
+   - For Links: SafeLink prevents default, shows modal
+   - For router.push: useSafeRouter shows modal first
+   - For browser back: popstate pushes state back, shows modal
+   - For browser refresh: beforeunload shows native browser dialog
+4. "Stay" - closes modal, user stays on page
+5. "Leave Without Saving" - clears dirty state, proceeds with navigation
+6. On save - form calls markClean() before navigation, no modal shown
 
 ## Airtable Changes
-See `crm/.claude/decisions/airtable-changelog.md` entry for 2026-01-16:
-- Added 4 refund tracking fields to Leads table via MCP tools
-
-## TypeScript Types Updated
-```typescript
-// In custom/types/airtable.ts - Lead interface
-'Refund Requested'?: boolean;
-'Refund Request Date'?: string;
-'Refund Request Note'?: string;
-'Refund Note'?: string;
-```
-
-## Refund Workflow
-1. Lead has a Lead Fee → shows rose badge with amount
-2. Click status dropdown → "Request Refund" (orange) → enter note → submit
-3. Lead shows orange "Request Refund" badge, Lead Fee section turns orange
-4. Click status dropdown → "Mark Refunded" (emerald) → enter note → submit
-5. Lead shows emerald "Refunded" badge, Lead Fee section turns gray with line-through
+None - this is purely a frontend feature
 
 ## Commits Pushed
 - None this session - changes need to be committed
@@ -86,11 +92,14 @@ See `crm/.claude/decisions/airtable-changelog.md` entry for 2026-01-16:
 
 ## Next Session Recommendations
 1. **Commit and push** all changes from this session
-2. **Test** refund workflow end-to-end:
-   - Request refund on a lead with lead fee
-   - Verify badge appears on pipeline and detail page
-   - Mark as refunded and verify notes display correctly
-3. **Test** calendar date parsing - verify jobs show on correct days
+2. **Test** unsaved changes guard:
+   - Edit a client, change a field, click sidebar nav → should show modal
+   - Click "Stay" → should return to form with data intact
+   - Click "Leave Without Saving" → should navigate away
+   - Edit and save → should navigate without modal
+   - Edit, then browser back → should show modal
+   - Edit, then refresh → should show browser native dialog
+3. Consider adding visual indicator showing form has unsaved changes (optional enhancement)
 
 ## Files to Read Next Session
 1. This file (`custom/.claude/HANDOFF.md`)

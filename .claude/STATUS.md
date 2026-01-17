@@ -1,7 +1,7 @@
 # Custom Next.js Portal - Status
 
-**Last Updated**: 2026-01-15
-**Session**: 29 (Cleaner Color Assignment Feature)
+**Last Updated**: 2026-01-16
+**Session**: 31 (Unsaved Changes Navigation Guard)
 **Progress**: Deployed to Production (100% complete)
 **Production URL**: https://tidyco-crm.vercel.app
 **GitHub Repo**: https://github.com/webbhayes1/tidyco-crm
@@ -226,6 +226,21 @@ custom/
 ---
 
 ## Session History
+
+### Session 31 (2026-01-16): Unsaved Changes Navigation Guard ✅
+- **Unsaved changes detection** - Forms now track dirty state by comparing current vs initial values
+- **Navigation interception** - Prompts user before navigating away with unsaved changes
+- **Created 6 new files**:
+  - `contexts/UnsavedChangesContext.tsx` - Global context for tracking dirty forms
+  - `components/UnsavedChangesModal.tsx` - Confirmation dialog (amber warning style)
+  - `hooks/useUnsavedChanges.ts` - Per-form hook with dirty detection, beforeunload, popstate
+  - `components/SafeLink.tsx` - Navigation-intercepting Link wrapper
+  - `hooks/useSafeRouter.ts` - Safe router.push/replace/back
+  - `components/Providers.tsx` - Client-side provider wrapper
+- **Updated all 6 forms**: ClientForm, CleanerForm, JobForm, TeamForm, LeadForm, InvoiceForm
+- **Updated Navigation.tsx** - Uses SafeLink for sidebar
+- **Updated DataTable.tsx** - Uses useSafeRouter instead of window.location
+- **Handles**: Sidebar links, router.push, DataTable clicks, browser back/forward, browser refresh
 
 ### Session 29 (2026-01-15): Cleaner Color Assignment Feature ✅
 - **Cleaner Color field added to Airtable** (via MCP tools) - Field ID: fldh2j3OT3GmUIdQC

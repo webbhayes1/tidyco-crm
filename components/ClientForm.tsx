@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { Client, Cleaner, Team } from '@/types/airtable';
 import { ScheduleSyncModal } from './ScheduleSyncModal';
 import { AddressAutocomplete } from './AddressAutocomplete';
 import { DraftRestoreModal } from './DraftRestoreModal';
 import { useDraftSave } from '@/hooks/useDraftSave';
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
 
 interface ClientFormProps {
   client?: Client;
@@ -174,6 +175,46 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
     notes: client?.fields.Notes || '',
   });
 
+  // Capture initial data for unsaved changes detection
+  const initialData = useMemo(() => ({
+    firstName: initialFirstName,
+    lastName: initialLastName,
+    email: client?.fields.Email || '',
+    phone: client?.fields.Phone || '',
+    address: client?.fields.Address || '',
+    addressLine2: client?.fields['Address Line 2'] || '',
+    city: client?.fields.City || '',
+    state: client?.fields.State || 'CA',
+    zipCode: client?.fields['Zip Code'] || '',
+    status: client?.fields.Status || 'Active',
+    owner: client?.fields.Owner || '',
+    preferredCleaner: client?.fields['Preferred Cleaner']?.[0] || '',
+    leadSource: client?.fields['Lead Source'] || '',
+    preferredPaymentMethod: client?.fields['Preferred Payment Method'] || '',
+    isRecurring: client?.fields['Is Recurring'] || false,
+    recurrenceFrequency: client?.fields['Recurrence Frequency'] || '',
+    recurringDay: client?.fields['Recurring Day'] || '',
+    recurringDays: client?.fields['Recurring Days']?.split(', ') || [],
+    recurringStartTime: client?.fields['Recurring Start Time'] || '8:00 AM',
+    recurringEndTime: client?.fields['Recurring End Time'] || '11:00 AM',
+    firstCleaningDate: client?.fields['First Cleaning Date'] || '',
+    pricingType: client?.fields['Pricing Type'] || 'Per Cleaning',
+    clientHourlyRate: client?.fields['Client Hourly Rate'] || 35,
+    chargePerCleaning: client?.fields['Charge Per Cleaning'] || 150,
+    bedrooms: client?.fields['Bedrooms'] || 3,
+    bathrooms: client?.fields['Bathrooms'] || 2,
+    preferences: client?.fields.Preferences || '',
+    entryInstructions: client?.fields['Entry Instructions'] || '',
+    notes: client?.fields.Notes || '',
+  }), [client?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Unsaved changes detection
+  const { markClean } = useUnsavedChanges({
+    formId: `client-${client?.id || 'new'}`,
+    formData,
+    initialData,
+  });
+
   // Draft save functionality - only for new clients
   const draftKey = client?.id ? `client-${client.id}` : 'new-client';
   const { hasDraft, draftData, clearDraft } = useDraftSave({
@@ -325,6 +366,8 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
             body: JSON.stringify(clientData),
           });
 
+          markClean(); // Mark form as clean since data was saved
+
           if (data.count > 0) {
             // Has future jobs - offer to sync them
             setSyncMode('sync');
@@ -343,6 +386,7 @@ export function ClientForm({ client, onSave, onCancel }: ClientFormProps) {
         }
       }
 
+      markClean(); // Mark form as clean before navigation
       clearDraft(); // Clear draft on successful save
       await onSave(clientData);
     } catch (error) {
